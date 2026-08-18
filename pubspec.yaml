@@ -1,0 +1,48 @@
+name: klok
+description: "Academic Countdown Dashboard for KTU college students."
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.12.2
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  cupertino_icons: ^1.0.8
+
+  # Firebase
+  firebase_core: ^3.15.1
+  firebase_auth: ^5.6.2
+  cloud_firestore: ^5.6.9
+  google_sign_in: ^6.3.0
+
+  # Local storage
+  shared_preferences: ^2.5.3
+
+  # Notifications
+  flutter_local_notifications: ^18.0.1
+
+  # Home widget
+  home_widget: ^0.7.0
+
+  # UUID for generating join codes
+  uuid: ^4.5.1
+
+  # Timezone support for scheduled notifications
+  timezone: ^0.9.4
+
+  # intl for date formatting
+  intl: ^0.20.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
+  # assets:
+  #   - assets/icons/
