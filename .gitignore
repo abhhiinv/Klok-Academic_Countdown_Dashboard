@@ -128,3 +128,4 @@ macos/Runner/GoogleService-Info.plist
 .vscode/
 .DS_Store
 run.bat
+progress.md

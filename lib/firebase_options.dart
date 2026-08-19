@@ -9,21 +9,18 @@
 
 import 'package:firebase_core/firebase_core.dart' show FirebaseOptions;
 import 'package:flutter/foundation.dart'
-    show defaultTargetPlatform, kIsWeb, TargetPlatform;
+    show defaultTargetPlatform, TargetPlatform;
 
 class DefaultFirebaseOptions {
   static FirebaseOptions get currentPlatform {
-      return web;
     switch (defaultTargetPlatform) {
       case TargetPlatform.android:
         return android;
       case TargetPlatform.iOS:
         return ios;
       default:
-        throw UnsupportedError(
-          'DefaultFirebaseOptions have not been configured for '
-          '${defaultTargetPlatform.name} - please run flutterfire configure.',
-        );
+        // Web and others fall back to web config
+        return web;
     }
   }
 

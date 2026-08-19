@@ -1,9 +1,11 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../models/event.dart';
 import '../models/class_group.dart';
 import '../services/firestore_service.dart';
 import '../services/auth_service.dart';
+import '../services/local_storage_service.dart';
 import '../widgets/event_card.dart';
 import '../widgets/category_tab_bar.dart';
 import 'add_event_screen.dart';
@@ -11,8 +13,11 @@ import 'archive_screen.dart';
 import 'onboarding_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
-  final User user;
-  final String classId;
+  /// null when in offline/guest mode
+  final User? user;
+
+  /// null when in offline/guest mode
+  final String? classId;
 
   const DashboardScreen({
     super.key,
@@ -28,35 +33,77 @@ class _DashboardScreenState extends State<DashboardScreen>
     with SingleTickerProviderStateMixin {
   final _firestoreService = FirestoreService();
   final _authService = AuthService();
+  final _localService = LocalStorageService();
 
   late TabController _tabController;
   String _selectedCategory = 'All';
   ClassGroup? _classGroup;
 
+  // For offline personal events we use a StreamController so deletes/adds
+  // can trigger a refresh without Firestore.
+  final _localEventsController = StreamController<List<Event>>.broadcast();
+
+  bool get _isOffline => widget.user == null;
+
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
-    _loadClassGroup();
+    // Online: 2 tabs (Class + Personal). Offline: 1 tab (Personal only).
+    _tabController = TabController(length: _isOffline ? 1 : 2, vsync: this);
+    if (!_isOffline) {
+      _loadClassGroup();
+    } else {
+      _refreshLocalEvents();
+    }
   }
 
   Future<void> _loadClassGroup() async {
-    final group = await _firestoreService.getClass(widget.classId);
+    final group = await _firestoreService.getClass(widget.classId!);
     if (mounted) setState(() => _classGroup = group);
+  }
+
+  Future<void> _refreshLocalEvents() async {
+    final events = await _localService.getPersonalEvents();
+    if (!_localEventsController.isClosed) {
+      _localEventsController.add(events);
+    }
   }
 
   @override
   void dispose() {
     _tabController.dispose();
+    _localEventsController.close();
     super.dispose();
   }
 
-
-  bool get _isAdmin =>
-      _classGroup?.isAdmin(widget.user.uid) ?? false;
+  bool get _isAdmin => _classGroup?.isAdmin(widget.user?.uid ?? '') ?? false;
 
   Future<void> _signOut() async {
     await _authService.signOut();
+    if (mounted) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const OnboardingScreen()),
+      );
+    }
+  }
+
+  Future<void> _goOffline() async {
+    // Switch from signed-in to offline/guest mode
+    await _localService.setOfflineMode(true);
+    if (mounted) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (_) => DashboardScreen(user: null, classId: null),
+        ),
+      );
+    }
+  }
+
+  Future<void> _signInForClass() async {
+    // Clear offline flag and go back to onboarding so user can sign in
+    await _localService.setOfflineMode(false);
     if (mounted) {
       Navigator.pushReplacement(
         context,
@@ -71,102 +118,73 @@ class _DashboardScreenState extends State<DashboardScreen>
 
     return Scaffold(
       backgroundColor: theme.colorScheme.surface,
-      body: NestedScrollView(
-        headerSliverBuilder: (context, innerBoxIsScrolled) => [
-          SliverAppBar(
-            floating: true,
-            snap: true,
-            backgroundColor: theme.colorScheme.surface,
-            elevation: 0,
-            title: Row(
-              children: [
-                Container(
-                  width: 32,
-                  height: 32,
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.primary,
-                    borderRadius: BorderRadius.circular(9),
-                  ),
-                  child: const Icon(Icons.access_time_rounded,
-                      color: Colors.white, size: 18),
-                ),
-                const SizedBox(width: 10),
-                Text(
-                  'Klok',
-                  style: theme.textTheme.titleLarge?.copyWith(
-                    fontFamily: 'Inter',
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: -0.5,
-                  ),
-                ),
-              ],
-            ),
-            actions: [
-              IconButton(
-                icon: const Icon(Icons.archive_rounded),
-                tooltip: 'Archive',
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => ArchiveScreen(
-                        user: widget.user,
-                        classId: widget.classId,
-                        isAdmin: _isAdmin,
-                      ),
+      body: SafeArea(
+        child: Column(
+          children: [
+            // ── App Bar ──────────────────────────────────────────────
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 4, 0),
+              child: Row(
+                children: [
+                  Container(
+                    width: 32,
+                    height: 32,
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.primary,
+                      borderRadius: BorderRadius.circular(9),
                     ),
-                  );
-                },
-              ),
-              PopupMenuButton<String>(
-                icon: CircleAvatar(
-                  radius: 16,
-                  backgroundImage: widget.user.photoURL != null
-                      ? NetworkImage(widget.user.photoURL!)
-                      : null,
-                  backgroundColor: theme.colorScheme.primaryContainer,
-                  child: widget.user.photoURL == null
-                      ? Text(
-                          widget.user.displayName?.substring(0, 1) ?? 'U',
-                          style: const TextStyle(
-                              fontWeight: FontWeight.bold),
-                        )
-                      : null,
-                ),
-                onSelected: (val) {
-                  if (val == 'signout') _signOut();
-                  if (val == 'code' && _classGroup != null) {
-                    _showClassCode(context, _classGroup!.classCode);
-                  }
-                },
-                itemBuilder: (_) => [
-                  if (_classGroup != null)
-                    PopupMenuItem(
-                      value: 'code',
-                      child: Row(children: [
-                        const Icon(Icons.key_rounded, size: 18),
-                        const SizedBox(width: 8),
-                        Text('Join Code: ${_classGroup!.classCode}'),
-                      ]),
-                    ),
-                  const PopupMenuItem(
-                    value: 'signout',
-                    child: Row(children: [
-                      Icon(Icons.logout_rounded, size: 18),
-                      SizedBox(width: 8),
-                      Text('Sign out'),
-                    ]),
+                    child: const Icon(Icons.access_time_rounded,
+                        color: Colors.white, size: 18),
                   ),
+                  const SizedBox(width: 10),
+                  Text(
+                    'Klok',
+                    style: theme.textTheme.titleLarge?.copyWith(
+                      fontFamily: 'Inter',
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: -0.5,
+                    ),
+                  ),
+                  const Spacer(),
+
+                  // Archive button — only available when signed in (has classId)
+                  if (!_isOffline)
+                    IconButton(
+                      icon: const Icon(Icons.archive_rounded),
+                      tooltip: 'Archive',
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => ArchiveScreen(
+                              user: widget.user!,
+                              classId: widget.classId!,
+                              isAdmin: _isAdmin,
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+
+                  // Account menu
+                  _isOffline
+                      ? _OfflineMenu(onSignIn: _signInForClass)
+                      : _OnlineMenu(
+                          user: widget.user!,
+                          classGroup: _classGroup,
+                          onSignOut: _signOut,
+                          onShowCode: () =>
+                              _showClassCode(context, _classGroup!.classCode),
+                          onGoOffline: _goOffline,
+                        ),
+
+                  const SizedBox(width: 4),
                 ],
               ),
-              const SizedBox(width: 4),
-            ],
-          ),
+            ),
 
-          // Tab bar
-          SliverPersistentHeader(
-            pinned: true,
-            delegate: _SliverTabBarDelegate(
+            // ── Tab Bar ───────────────────────────────────────────────
+            if (!_isOffline)
               TabBar(
                 controller: _tabController,
                 labelColor: theme.colorScheme.primary,
@@ -180,68 +198,116 @@ class _DashboardScreenState extends State<DashboardScreen>
                   fontSize: 14,
                 ),
                 tabs: [
-                  Tab(
-                    text: _classGroup?.name ?? 'Class',
-                  ),
+                  Tab(text: _classGroup?.name ?? 'Class'),
                   const Tab(text: 'Personal'),
                 ],
+              )
+            else
+              // Offline: show a slim banner explaining state
+              Container(
+                margin: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.surfaceContainerHighest,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.wifi_off_rounded,
+                        size: 16,
+                        color: theme.colorScheme.onSurface
+                            .withValues(alpha: 0.5)),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Offline mode — personal events only',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: theme.colorScheme.onSurface
+                              .withValues(alpha: 0.55),
+                        ),
+                      ),
+                    ),
+                    GestureDetector(
+                      onTap: _signInForClass,
+                      child: Text(
+                        'Sign in',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: theme.colorScheme.primary,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
-              backgroundColor: theme.colorScheme.surface,
-            ),
-          ),
-        ],
-        body: Column(
-          children: [
+
+            // ── Category Filter ────────────────────────────────────────
             const SizedBox(height: 12),
             CategoryTabBar(
               selected: _selectedCategory,
-              onSelected: (cat) =>
-                  setState(() => _selectedCategory = cat),
+              onSelected: (cat) => setState(() => _selectedCategory = cat),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 12),
+
+            // ── Feeds ─────────────────────────────────────────────────
             Expanded(
-              child: TabBarView(
-                controller: _tabController,
-                children: [
-                  // Class feed
-                  _EventFeed(
-                    stream: _firestoreService
-                        .classEventsStream(widget.classId),
-                    category: _selectedCategory,
-                    isAdmin: _isAdmin,
-                    onDelete: (event) => _firestoreService.deleteClassEvent(
-                        widget.classId, event.id),
-                    emptyMessage: 'No upcoming class events.\nAdd one!',
-                  ),
-                  // Personal feed
-                  _EventFeed(
-                    stream: _firestoreService
-                        .personalEventsStream(widget.user.uid),
-                    category: _selectedCategory,
-                    isAdmin: true, // user can always delete own events
-                    onDelete: (event) =>
-                        _firestoreService.deletePersonalEvent(
-                            widget.user.uid, event.id),
-                    emptyMessage: 'No personal events.\nAdd one!',
-                  ),
-                ],
-              ),
+              child: _isOffline
+                  ? _EventFeed(
+                      stream: _localEventsController.stream,
+                      category: _selectedCategory,
+                      isAdmin: true,
+                      onDelete: (event) async {
+                        await _localService.deletePersonalEvent(event.id);
+                        _refreshLocalEvents();
+                      },
+                      emptyMessage: 'No personal events.\nAdd one!',
+                    )
+                  : TabBarView(
+                      controller: _tabController,
+                      children: [
+                        _EventFeed(
+                          stream: _firestoreService
+                              .classEventsStream(widget.classId!),
+                          category: _selectedCategory,
+                          isAdmin: _isAdmin,
+                          onDelete: (event) => _firestoreService
+                              .deleteClassEvent(widget.classId!, event.id),
+                          emptyMessage: 'No upcoming class events.\nAdd one!',
+                        ),
+                        _EventFeed(
+                          stream: _firestoreService
+                              .personalEventsStream(widget.user!.uid),
+                          category: _selectedCategory,
+                          isAdmin: true,
+                          onDelete: (event) =>
+                              _firestoreService.deletePersonalEvent(
+                                  widget.user!.uid, event.id),
+                          emptyMessage: 'No personal events.\nAdd one!',
+                        ),
+                      ],
+                    ),
             ),
           ],
         ),
       ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () {
-          Navigator.push(
+        onPressed: () async {
+          await Navigator.push(
             context,
             MaterialPageRoute(
               builder: (_) => AddEventScreen(
                 user: widget.user,
                 classId: widget.classId,
                 initialFeedIndex: _tabController.index,
+                onLocalEventAdded: _isOffline ? _refreshLocalEvents : null,
               ),
             ),
           );
+          // Refresh local events if offline after returning from add screen
+          if (_isOffline) _refreshLocalEvents();
         },
         icon: const Icon(Icons.add_rounded),
         label: const Text('Add Event',
@@ -286,6 +352,104 @@ class _DashboardScreenState extends State<DashboardScreen>
     );
   }
 }
+
+// ─── Account menus ─────────────────────────────────────────────────────────
+
+class _OfflineMenu extends StatelessWidget {
+  final VoidCallback onSignIn;
+  const _OfflineMenu({required this.onSignIn});
+
+  @override
+  Widget build(BuildContext context) {
+    return PopupMenuButton<String>(
+      icon: const CircleAvatar(
+        radius: 16,
+        child: Icon(Icons.person_rounded, size: 18),
+      ),
+      onSelected: (val) {
+        if (val == 'signin') onSignIn();
+      },
+      itemBuilder: (_) => [
+        const PopupMenuItem(
+          value: 'signin',
+          child: Row(children: [
+            Icon(Icons.login_rounded, size: 18),
+            SizedBox(width: 8),
+            Text('Sign in for class access'),
+          ]),
+        ),
+      ],
+    );
+  }
+}
+
+class _OnlineMenu extends StatelessWidget {
+  final User user;
+  final ClassGroup? classGroup;
+  final VoidCallback onSignOut;
+  final VoidCallback onShowCode;
+  final VoidCallback onGoOffline;
+  const _OnlineMenu({
+    required this.user,
+    required this.classGroup,
+    required this.onSignOut,
+    required this.onShowCode,
+    required this.onGoOffline,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return PopupMenuButton<String>(
+      icon: CircleAvatar(
+        radius: 16,
+        backgroundImage:
+            user.photoURL != null ? NetworkImage(user.photoURL!) : null,
+        backgroundColor: theme.colorScheme.primaryContainer,
+        child: user.photoURL == null
+            ? Text(
+                user.displayName?.substring(0, 1) ?? 'U',
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              )
+            : null,
+      ),
+      onSelected: (val) {
+        if (val == 'signout') onSignOut();
+        if (val == 'code' && classGroup != null) onShowCode();
+        if (val == 'offline') onGoOffline();
+      },
+      itemBuilder: (_) => [
+        if (classGroup != null)
+          PopupMenuItem(
+            value: 'code',
+            child: Row(children: [
+              const Icon(Icons.key_rounded, size: 18),
+              const SizedBox(width: 8),
+              Text('Join Code: ${classGroup!.classCode}'),
+            ]),
+          ),
+        const PopupMenuItem(
+          value: 'offline',
+          child: Row(children: [
+            Icon(Icons.wifi_off_rounded, size: 18),
+            SizedBox(width: 8),
+            Text('Switch to offline mode'),
+          ]),
+        ),
+        const PopupMenuItem(
+          value: 'signout',
+          child: Row(children: [
+            Icon(Icons.logout_rounded, size: 18),
+            SizedBox(width: 8),
+            Text('Sign out'),
+          ]),
+        ),
+      ],
+    );
+  }
+}
+
+// ─── Event feed ────────────────────────────────────────────────────────────
 
 class _EventFeed extends StatelessWidget {
   final Stream<List<Event>> stream;
@@ -359,8 +523,7 @@ class _EventFeed extends StatelessWidget {
         }
 
         return ListView.builder(
-          padding:
-              const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
           itemCount: events.length,
           itemBuilder: (context, index) {
             final event = events[index];
@@ -374,28 +537,4 @@ class _EventFeed extends StatelessWidget {
       },
     );
   }
-}
-
-class _SliverTabBarDelegate extends SliverPersistentHeaderDelegate {
-  final TabBar tabBar;
-  final Color backgroundColor;
-
-  _SliverTabBarDelegate(this.tabBar, {required this.backgroundColor});
-
-  @override
-  double get minExtent => tabBar.preferredSize.height + 1;
-  @override
-  double get maxExtent => tabBar.preferredSize.height + 1;
-
-  @override
-  Widget build(
-      BuildContext context, double shrinkOffset, bool overlapsContent) {
-    return Container(
-      color: backgroundColor,
-      child: tabBar,
-    );
-  }
-
-  @override
-  bool shouldRebuild(_SliverTabBarDelegate oldDelegate) => false;
 }

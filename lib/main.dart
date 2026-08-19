@@ -3,6 +3,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
 import 'services/auth_service.dart';
 import 'services/firestore_service.dart';
+import 'services/local_storage_service.dart';
 import 'services/notification_service.dart';
 import 'screens/onboarding_screen.dart';
 import 'screens/dashboard_screen.dart';
@@ -103,9 +104,35 @@ class _AppRoot extends StatefulWidget {
 class _AppRootState extends State<_AppRoot> {
   final _authService = AuthService();
   final _firestoreService = FirestoreService();
+  final _localService = LocalStorageService();
+
+  // null = still loading
+  bool? _offlineMode;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkOfflineMode();
+  }
+
+  Future<void> _checkOfflineMode() async {
+    final offline = await _localService.isOfflineMode();
+    if (mounted) setState(() => _offlineMode = offline);
+  }
 
   @override
   Widget build(BuildContext context) {
+    // Still reading prefs
+    if (_offlineMode == null) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+
+    // User chose offline/guest mode — go straight to dashboard with no account
+    if (_offlineMode == true) {
+      return DashboardScreen(user: null, classId: null);
+    }
+
+    // Otherwise check Firebase auth state
     return StreamBuilder(
       stream: _authService.authStateChanges,
       builder: (context, snapshot) {
@@ -120,7 +147,7 @@ class _AppRootState extends State<_AppRoot> {
           return const OnboardingScreen();
         }
 
-        // User is signed in — check if they have a class
+        // Signed-in — check if they have a class
         return FutureBuilder<Map<String, dynamic>?>(
           future: _firestoreService.getUser(user.uid),
           builder: (context, userSnap) {
@@ -130,8 +157,7 @@ class _AppRootState extends State<_AppRoot> {
               );
             }
 
-            final classId =
-                userSnap.data?['classId'] as String?;
+            final classId = userSnap.data?['classId'] as String?;
 
             if (classId == null || classId.isEmpty) {
               return const OnboardingScreen();

@@ -1,19 +1,29 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:uuid/uuid.dart';
 import '../models/event.dart';
 import '../services/firestore_service.dart';
+import '../services/local_storage_service.dart';
 import '../services/notification_service.dart';
 
 class AddEventScreen extends StatefulWidget {
-  final User user;
-  final String classId;
+  /// null in offline/guest mode
+  final User? user;
+
+  /// null in offline/guest mode
+  final String? classId;
+
   final int initialFeedIndex; // 0 = class, 1 = personal
+
+  /// Called after a local event is saved (offline mode only)
+  final VoidCallback? onLocalEventAdded;
 
   const AddEventScreen({
     super.key,
     required this.user,
     required this.classId,
     this.initialFeedIndex = 0,
+    this.onLocalEventAdded,
   });
 
   @override
@@ -22,6 +32,8 @@ class AddEventScreen extends StatefulWidget {
 
 class _AddEventScreenState extends State<AddEventScreen> {
   final _firestoreService = FirestoreService();
+  final _localService = LocalStorageService();
+  final _uuid = const Uuid();
   final _titleController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
 
@@ -29,6 +41,8 @@ class _AddEventScreenState extends State<AddEventScreen> {
   DateTime? _selectedDate;
   bool _isPersonal = false;
   bool _isLoading = false;
+
+  bool get _isOffline => widget.user == null;
 
   static const _categories = [
     ('exam', 'Exam', Icons.school_rounded),
@@ -40,7 +54,8 @@ class _AddEventScreenState extends State<AddEventScreen> {
   @override
   void initState() {
     super.initState();
-    _isPersonal = widget.initialFeedIndex == 1;
+    // In offline mode, always save to personal (no class available)
+    _isPersonal = _isOffline || widget.initialFeedIndex == 1;
   }
 
   @override
@@ -95,20 +110,24 @@ class _AddEventScreenState extends State<AddEventScreen> {
     setState(() => _isLoading = true);
 
     final event = Event(
-      id: '',
+      id: _uuid.v4(),
       title: _titleController.text.trim(),
       category: _category,
       date: _selectedDate!,
-      createdBy: widget.user.uid,
+      createdBy: widget.user?.uid ?? 'local',
       createdAt: DateTime.now(),
       isPersonal: _isPersonal,
     );
 
     try {
-      if (_isPersonal) {
-        await _firestoreService.addPersonalEvent(widget.user.uid, event);
+      if (_isOffline) {
+        // Save to local device storage
+        await _localService.addPersonalEvent(event);
+        widget.onLocalEventAdded?.call();
+      } else if (_isPersonal) {
+        await _firestoreService.addPersonalEvent(widget.user!.uid, event);
       } else {
-        await _firestoreService.addClassEvent(widget.classId, event);
+        await _firestoreService.addClassEvent(widget.classId!, event);
       }
       await NotificationService.scheduleEventNotifications(event);
 
@@ -234,39 +253,42 @@ class _AddEventScreenState extends State<AddEventScreen> {
             ),
             const SizedBox(height: 24),
 
-            // Feed selector
-            Text(
-              'Add to',
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
-                letterSpacing: 0.5,
+            // Feed selector — hidden in offline mode (personal only)
+            if (!_isOffline) ...[
+              Text(
+                'Add to',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                  letterSpacing: 0.5,
+                ),
               ),
-            ),
-            const SizedBox(height: 10),
-            Row(
-              children: [
-                Expanded(
-                  child: _FeedChip(
-                    label: 'Class Feed',
-                    icon: Icons.group_rounded,
-                    selected: !_isPersonal,
-                    onTap: () => setState(() => _isPersonal = false),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  Expanded(
+                    child: _FeedChip(
+                      label: 'Class Feed',
+                      icon: Icons.group_rounded,
+                      selected: !_isPersonal,
+                      onTap: () => setState(() => _isPersonal = false),
+                    ),
                   ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: _FeedChip(
-                    label: 'Personal',
-                    icon: Icons.lock_rounded,
-                    selected: _isPersonal,
-                    onTap: () => setState(() => _isPersonal = true),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: _FeedChip(
+                      label: 'Personal',
+                      icon: Icons.lock_rounded,
+                      selected: _isPersonal,
+                      onTap: () => setState(() => _isPersonal = true),
+                    ),
                   ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 40),
+                ],
+              ),
+              const SizedBox(height: 40),
+            ] else
+              const SizedBox(height: 40),
 
             SizedBox(
               height: 54,

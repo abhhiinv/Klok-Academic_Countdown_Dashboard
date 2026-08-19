@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../services/auth_service.dart';
 import '../services/firestore_service.dart';
+import '../services/local_storage_service.dart';
 import 'dashboard_screen.dart';
 
 class OnboardingScreen extends StatefulWidget {
@@ -15,6 +16,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
     with SingleTickerProviderStateMixin {
   final _authService = AuthService();
   final _firestoreService = FirestoreService();
+  final _localService = LocalStorageService();
 
   bool _isLoading = false;
   String? _errorMessage;
@@ -46,6 +48,18 @@ class _OnboardingScreenState extends State<OnboardingScreen>
     _classNameController.dispose();
     _joinCodeController.dispose();
     super.dispose();
+  }
+
+  Future<void> _useOffline() async {
+    await _localService.setOfflineMode(true);
+    if (mounted) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (_) => DashboardScreen(user: null, classId: null),
+        ),
+      );
+    }
   }
 
   Future<void> _signIn() async {
@@ -206,6 +220,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                   _SignInSection(
                     isLoading: _isLoading,
                     onSignIn: _signIn,
+                    onUseOffline: _useOffline,
                   ),
                 ] else ...[
                   _ClassSetupSection(
@@ -257,8 +272,11 @@ class _OnboardingScreenState extends State<OnboardingScreen>
 class _SignInSection extends StatelessWidget {
   final bool isLoading;
   final VoidCallback onSignIn;
+  final VoidCallback onUseOffline;
   const _SignInSection(
-      {required this.isLoading, required this.onSignIn});
+      {required this.isLoading,
+      required this.onSignIn,
+      required this.onUseOffline});
 
   @override
   Widget build(BuildContext context) {
@@ -269,7 +287,8 @@ class _SignInSection extends StatelessWidget {
             icon: Icons.timer_rounded, label: 'Live countdown for every event'),
         const SizedBox(height: 12),
         _FeatureRow(
-            icon: Icons.group_rounded, label: 'Shared class feed with join codes'),
+            icon: Icons.group_rounded,
+            label: 'Shared class feed with join codes (requires sign-in)'),
         const SizedBox(height: 12),
         _FeatureRow(
             icon: Icons.lock_rounded, label: 'Private personal event space'),
@@ -281,6 +300,20 @@ class _SignInSection extends StatelessWidget {
         const SizedBox(height: 40),
 
         _GoogleSignInButton(isLoading: isLoading, onSignIn: onSignIn),
+
+        const SizedBox(height: 14),
+
+        // Offline / guest option
+        TextButton(
+          onPressed: isLoading ? null : onUseOffline,
+          child: Text(
+            'Use without signing in',
+            style: TextStyle(
+              fontSize: 14,
+              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
+            ),
+          ),
+        ),
       ],
     );
   }

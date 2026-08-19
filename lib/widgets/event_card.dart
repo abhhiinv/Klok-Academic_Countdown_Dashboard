@@ -56,9 +56,11 @@ class _EventCardState extends State<EventCard>
 
     return AnimatedBuilder(
       animation: _scale,
-      builder: (context, child) => Transform.scale(
-        scale: event.urgencyLevel == 0 ? _scale.value : 1.0,
-        child: child,
+      builder: (context, child) => RepaintBoundary(
+        child: Transform.scale(
+          scale: event.urgencyLevel == 0 ? _scale.value : 1.0,
+          child: child,
+        ),
       ),
       child: Container(
         margin: const EdgeInsets.only(bottom: 12),
