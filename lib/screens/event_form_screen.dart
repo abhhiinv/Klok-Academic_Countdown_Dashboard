@@ -43,7 +43,9 @@ class _AddEventScreenState extends State<AddEventScreen> {
   final _firestoreService = FirestoreService();
   final _localService = LocalStorageService();
   final _uuid = const Uuid();
+
   late final TextEditingController _titleController;
+  late final TextEditingController _customCategoryController;
   final _formKey = GlobalKey<FormState>();
 
   late String _category;
@@ -66,11 +68,21 @@ class _AddEventScreenState extends State<AddEventScreen> {
     super.initState();
     if (_isEditing) {
       _titleController = TextEditingController(text: widget.eventToEdit!.title);
-      _category = widget.eventToEdit!.category;
+      
+      // Check if it's a standard category, otherwise set to 'other' and fill the custom field
+      if (['exam', 'submission', 'fest'].contains(widget.eventToEdit!.category)) {
+        _category = widget.eventToEdit!.category;
+        _customCategoryController = TextEditingController();
+      } else {
+        _category = 'other';
+        _customCategoryController = TextEditingController(text: widget.eventToEdit!.category);
+      }
+      
       _selectedDate = widget.eventToEdit!.date;
       _isPersonal = widget.eventToEdit!.isPersonal;
     } else {
       _titleController = TextEditingController();
+      _customCategoryController = TextEditingController();
       _category = 'exam';
       _isPersonal = _isOffline || widget.initialFeedIndex == 1;
     }
@@ -79,6 +91,7 @@ class _AddEventScreenState extends State<AddEventScreen> {
   @override
   void dispose() {
     _titleController.dispose();
+    _customCategoryController.dispose();
     super.dispose();
   }
 
@@ -153,10 +166,15 @@ class _AddEventScreenState extends State<AddEventScreen> {
 
     setState(() => _isLoading = true);
 
+    // Resolve the final category string
+    final finalCategory = _category == 'other' 
+        ? _customCategoryController.text.trim() 
+        : _category;
+
     final event = Event(
       id: _isEditing ? widget.eventToEdit!.id : _uuid.v4(),
       title: _titleController.text.trim(),
-      category: _category,
+      category: finalCategory,
       date: _selectedDate!,
       createdBy: _isEditing ? widget.eventToEdit!.createdBy : (widget.user?.uid ?? 'local'),
       createdAt: _isEditing ? widget.eventToEdit!.createdAt : DateTime.now(),
@@ -172,23 +190,23 @@ class _AddEventScreenState extends State<AddEventScreen> {
         }
         widget.onLocalEventAdded?.call();
       } else {
-        // If the user changed the feed type (Class <-> Personal) while editing, 
-        // we must delete the old record from the old location and create a new one.
-        if (_isEditing && _isPersonal != widget.eventToEdit!.isPersonal) {
-           if (widget.eventToEdit!.isPersonal) {
-              await _firestoreService.deletePersonalEvent(widget.user!.uid, event.id);
-              await _firestoreService.addClassEvent(widget.classId!, event);
-           } else {
-              await _firestoreService.deleteClassEvent(widget.classId!, event.id);
-              await _firestoreService.addPersonalEvent(widget.user!.uid, event);
-           }
-        } else {
-          // Standard add/update
-          if (_isPersonal) {
-            await _firestoreService.addPersonalEvent(widget.user!.uid, event);
+        
+        // ── ONLINE MODE ──
+        if (_isEditing) {
+          // ALWAYS delete the old event first when editing. 
+          // This prevents duplication and cleanly handles moving events between feeds.
+          if (widget.eventToEdit!.isPersonal) {
+            await _firestoreService.deletePersonalEvent(widget.user!.uid, widget.eventToEdit!.id);
           } else {
-            await _firestoreService.addClassEvent(widget.classId!, event);
+            await _firestoreService.deleteClassEvent(widget.classId!, widget.eventToEdit!.id);
           }
+        }
+        
+        // Add the new/updated event
+        if (_isPersonal) {
+          await _firestoreService.addPersonalEvent(widget.user!.uid, event);
+        } else {
+          await _firestoreService.addClassEvent(widget.classId!, event);
         }
       }
       
@@ -279,6 +297,30 @@ class _AddEventScreenState extends State<AddEventScreen> {
                   ),
                 );
               }).toList(),
+            ),
+            // Custom Category Input (Shows only when 'other' is selected)
+            AnimatedSize(
+              duration: const Duration(milliseconds: 250),
+              curve: Curves.easeInOut,
+              child: _category == 'other'
+                  ? Padding(
+                      padding: const EdgeInsets.only(top: 16),
+                      child: TextFormField(
+                        controller: _customCategoryController,
+                        textCapitalization: TextCapitalization.words,
+                        style: const TextStyle(fontFamily: 'Inter', color: _onSurface),
+                        decoration: _inputDecoration(
+                          context,
+                          label: 'Specify category',
+                          hint: 'e.g. Project Review, Meeting',
+                          icon: Icons.label_outline_rounded,
+                        ),
+                        validator: (v) => _category == 'other' && (v == null || v.trim().isEmpty)
+                            ? 'Please specify a category name'
+                            : null,
+                      ),
+                    )
+                  : const SizedBox.shrink(),
             ),
             const SizedBox(height: 24),
 

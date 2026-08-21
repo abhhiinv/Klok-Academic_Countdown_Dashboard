@@ -6,6 +6,7 @@ import '../models/event.dart';
 import '../models/class_group.dart';
 import '../services/firestore_service.dart';
 import '../services/auth_service.dart';
+import '../services/notification_service.dart';
 import '../services/local_storage_service.dart';
 import '../widgets/event_card.dart';
 import '../widgets/category_tab_bar.dart';
@@ -67,14 +68,16 @@ class _DashboardScreenState extends State<DashboardScreen>
   void initState() {
     super.initState();
     _tabController = TabController(length: _isOffline ? 1 : 2, vsync: this);
-    
+
     // Use preloaded class group immediately to prevent layout pop-in
     _classGroup = widget.initialClassGroup;
 
     if (!_isOffline) {
       _classEventsStream = _firestoreService.classEventsStream(widget.classId!);
-      _personalEventsStream = _firestoreService.personalEventsStream(widget.user!.uid);
-      
+      _personalEventsStream = _firestoreService.personalEventsStream(
+        widget.user!.uid,
+      );
+
       // Only make network call if we didn't receive initial data
       if (_classGroup == null) {
         _loadClassGroup();
@@ -146,7 +149,7 @@ class _DashboardScreenState extends State<DashboardScreen>
       onPopInvokedWithResult: (didPop, result) {
         if (didPop) return;
         // Forces the hardware back button to use our exact app-level pop
-        Navigator.pop(context, result); 
+        Navigator.pop(context, result);
       },
       child: Scaffold(
         backgroundColor: _bg,
@@ -160,7 +163,11 @@ class _DashboardScreenState extends State<DashboardScreen>
                   children: [
                     if (!_isOffline)
                       IconButton(
-                        icon: const Icon(Icons.arrow_back_ios_new_rounded, color: _onSurface, size: 22),
+                        icon: const Icon(
+                          Icons.arrow_back_ios_new_rounded,
+                          color: _onSurface,
+                          size: 22,
+                        ),
                         onPressed: () => Navigator.pop(context),
                       ),
                     if (_isOffline) const SizedBox(width: 12),
@@ -190,8 +197,11 @@ class _DashboardScreenState extends State<DashboardScreen>
                     // Archive
                     if (!_isOffline)
                       IconButton(
-                        icon: const Icon(Icons.archive_outlined,
-                            color: _muted, size: 32),
+                        icon: const Icon(
+                          Icons.archive_outlined,
+                          color: _muted,
+                          size: 32,
+                        ),
                         tooltip: 'Archive',
                         onPressed: () => Navigator.push(
                           context,
@@ -250,7 +260,10 @@ class _DashboardScreenState extends State<DashboardScreen>
               else
                 Container(
                   margin: const EdgeInsets.fromLTRB(16, 10, 16, 0),
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 14,
+                  ),
                   decoration: BoxDecoration(
                     color: _surfaceHigh,
                     borderRadius: BorderRadius.circular(10),
@@ -258,13 +271,20 @@ class _DashboardScreenState extends State<DashboardScreen>
                   ),
                   child: Row(
                     children: [
-                      const Icon(Icons.wifi_off_rounded, size: 30, color: _terracotta),
+                      const Icon(
+                        Icons.wifi_off_rounded,
+                        size: 30,
+                        color: _terracotta,
+                      ),
                       const SizedBox(width: 8),
                       const Expanded(
                         child: Text(
                           'Offline-Mode : Privacy first mode',
                           style: TextStyle(
-                              fontFamily: 'Inter', fontSize: 13, color: _onSurface),
+                            fontFamily: 'Inter',
+                            fontSize: 13,
+                            color: _onSurface,
+                          ),
                         ),
                       ),
                       GestureDetector(
@@ -314,115 +334,126 @@ class _DashboardScreenState extends State<DashboardScreen>
 
               // ── Feeds ─────────────────────────────────────────────────
               // ── Feeds ─────────────────────────────────────────────────
-            Expanded(
-              child: _isOffline
-                  ? _EventFeed(
-                      stream: _localEventsController.stream,
-                      category: _selectedCategory,
-                      isAdmin: true,
-                      onDelete: (event) async {
-                        await _localService.deletePersonalEvent(event.id);
-                        _refreshLocalEvents();
-                      },
-                      onEdit: (event) async {
-                        await Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => AddEventScreen(
-                              user: widget.user,
-                              classId: widget.classId,
-                              initialFeedIndex: 1,
-                              eventToEdit: event,
-                              onLocalEventAdded: _refreshLocalEvents,
+              Expanded(
+                child: _isOffline
+                    ? _EventFeed(
+                        stream: _localEventsController.stream,
+                        category: _selectedCategory,
+                        isAdmin: true,
+                        onDelete: (event) async {
+                          await _localService.deletePersonalEvent(event.id);
+                          _refreshLocalEvents();
+                        },
+                        onEdit: (event) async {
+                          await Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => AddEventScreen(
+                                user: widget.user,
+                                classId: widget.classId,
+                                initialFeedIndex: 1,
+                                eventToEdit: event,
+                                onLocalEventAdded: _refreshLocalEvents,
+                              ),
                             ),
+                          );
+                          _refreshLocalEvents();
+                        },
+                        emptyMessage: 'No personal events.\nTap + to add one.',
+                      )
+                    : TabBarView(
+                        controller: _tabController,
+                        children: [
+                          _EventFeed(
+                            stream: _classEventsStream!,
+                            category: _selectedCategory,
+                            isAdmin: _isAdmin,
+                            onDelete: (event) async {
+                              await _firestoreService.deleteClassEvent(
+                                widget.classId!,
+                                event.id,
+                              );
+                              await NotificationService.cancelEventNotifications(
+                                event,
+                              ); // Cancel the alarms!
+                            },
+                            onEdit: (event) async {
+                              await Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => AddEventScreen(
+                                    user: widget.user,
+                                    classId: widget.classId,
+                                    initialFeedIndex: 0,
+                                    eventToEdit: event,
+                                  ),
+                                ),
+                              );
+                            },
+                            emptyMessage:
+                                'No upcoming class events.\nTap + to add one.',
                           ),
-                        );
-                        _refreshLocalEvents();
-                      },
-                      emptyMessage: 'No personal events.\nTap + to add one.',
-                    )
-                  : TabBarView(
-                      controller: _tabController,
-                      children: [
-                        _EventFeed(
-                          stream: _classEventsStream!,
-                          category: _selectedCategory,
-                          isAdmin: _isAdmin,
-                          onDelete: (event) => _firestoreService
-                              .deleteClassEvent(widget.classId!, event.id),
-                          onEdit: (event) async {
-                            await Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => AddEventScreen(
-                                  user: widget.user,
-                                  classId: widget.classId,
-                                  initialFeedIndex: 0,
-                                  eventToEdit: event,
+                          _EventFeed(
+                            stream: _personalEventsStream!,
+                            category: _selectedCategory,
+                            isAdmin: true,
+                            onDelete: (event) async {
+                              await _firestoreService.deletePersonalEvent(widget.user!.uid, event.id);
+                              await NotificationService.cancelEventNotifications(event); // Cancel the alarms!
+                            },
+                            onEdit: (event) async {
+                              await Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => AddEventScreen(
+                                    user: widget.user,
+                                    classId: widget.classId,
+                                    initialFeedIndex: 1,
+                                    eventToEdit: event,
+                                  ),
                                 ),
-                              ),
-                            );
-                          },
-                          emptyMessage:
-                              'No upcoming class events.\nTap + to add one.',
-                        ),
-                        _EventFeed(
-                          stream: _personalEventsStream!,
-                          category: _selectedCategory,
-                          isAdmin: true,
-                          onDelete: (event) =>
-                              _firestoreService.deletePersonalEvent(
-                                  widget.user!.uid, event.id),
-                          onEdit: (event) async {
-                            await Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => AddEventScreen(
-                                  user: widget.user,
-                                  classId: widget.classId,
-                                  initialFeedIndex: 1,
-                                  eventToEdit: event,
-                                ),
-                              ),
-                            );
-                          },
-                          emptyMessage:
-                              'No personal events.\nTap + to add one.',
-                        ),
-                      ],
-                    ),
-            ),
+                              );
+                            },
+                            emptyMessage:
+                                'No personal events.\nTap + to add one.',
+                          ),
+                        ],
+                      ),
+              ),
             ],
           ),
         ),
-        
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () async {
-          await Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => AddEventScreen(
-                user: widget.user,
-                classId: widget.classId,
-                initialFeedIndex: _tabController.index,
-                onLocalEventAdded: _isOffline ? _refreshLocalEvents : null,
+
+        floatingActionButton: FloatingActionButton.extended(
+          onPressed: () async {
+            await Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => AddEventScreen(
+                  user: widget.user,
+                  classId: widget.classId,
+                  initialFeedIndex: _tabController.index,
+                  onLocalEventAdded: _isOffline ? _refreshLocalEvents : null,
+                ),
               ),
-            ),
-          );
-          if (_isOffline) _refreshLocalEvents();
-        },
-        icon: const Icon(Icons.add_rounded, color: _onPrimary),
-        label: const Text('Add Event',
+            );
+            if (_isOffline) _refreshLocalEvents();
+          },
+          icon: const Icon(Icons.add_rounded, color: _onPrimary),
+          label: const Text(
+            'Add Event',
             style: TextStyle(
-                fontFamily: 'Inter',
-                fontWeight: FontWeight.w700,
-                color: _onPrimary,
-                letterSpacing: 0.1)),
-        backgroundColor: _primary,
-        elevation: 0,
+              fontFamily: 'Inter',
+              fontWeight: FontWeight.w700,
+              color: _onPrimary,
+              letterSpacing: 0.1,
+            ),
+          ),
+          backgroundColor: _primary,
+          elevation: 0,
+        ),
       ),
-    ),
-  );
+    );
   }
 }
 
@@ -457,7 +488,9 @@ class _JoinCodeChipState extends State<_JoinCodeChip> {
           color: _copied ? _primaryContainer : _surfaceHigh,
           borderRadius: BorderRadius.circular(10),
           border: Border.all(
-            color: _copied ? _primary.withValues(alpha: 0.4) : Colors.transparent,
+            color: _copied
+                ? _primary.withValues(alpha: 0.4)
+                : Colors.transparent,
           ),
         ),
         child: Row(
@@ -520,12 +553,16 @@ class _OfflineMenu extends StatelessWidget {
       itemBuilder: (_) => [
         const PopupMenuItem(
           value: 'signin',
-          child: Row(children: [
-            Icon(Icons.login_rounded, size: 24, color: _primary),
-            SizedBox(width: 8),
-            Text('Sign in for class access',
-                style: TextStyle(fontFamily: 'Inter', color: _onSurface)),
-          ]),
+          child: Row(
+            children: [
+              Icon(Icons.login_rounded, size: 24, color: _primary),
+              SizedBox(width: 8),
+              Text(
+                'Sign in for class access',
+                style: TextStyle(fontFamily: 'Inter', color: _onSurface),
+              ),
+            ],
+          ),
         ),
       ],
     );
@@ -537,7 +574,7 @@ class _OnlineMenu extends StatelessWidget {
   final ClassGroup? classGroup;
   final VoidCallback onSignOut;
   final VoidCallback onGoOffline;
-  
+
   const _OnlineMenu({
     required this.user,
     required this.classGroup,
@@ -555,16 +592,18 @@ class _OnlineMenu extends StatelessWidget {
       ),
       icon: CircleAvatar(
         radius: 20,
-        backgroundImage:
-            user.photoURL != null ? NetworkImage(user.photoURL!) : null,
+        backgroundImage: user.photoURL != null
+            ? NetworkImage(user.photoURL!)
+            : null,
         backgroundColor: _primaryContainer,
         child: user.photoURL == null
             ? Text(
                 user.displayName?.substring(0, 1) ?? 'U',
                 style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontFamily: 'Inter',
-                    color: _primary),
+                  fontWeight: FontWeight.bold,
+                  fontFamily: 'Inter',
+                  color: _primary,
+                ),
               )
             : null,
       ),
@@ -575,22 +614,30 @@ class _OnlineMenu extends StatelessWidget {
       itemBuilder: (_) => [
         const PopupMenuItem(
           value: 'offline',
-          child: Row(children: [
-            Icon(Icons.wifi_off_rounded, size: 18, color: _onSurface),
-            SizedBox(width: 8),
-            Text('Switch to offline mode',
-                style: TextStyle(fontFamily: 'Inter', color: _onSurface)),
-          ]),
+          child: Row(
+            children: [
+              Icon(Icons.wifi_off_rounded, size: 18, color: _onSurface),
+              SizedBox(width: 8),
+              Text(
+                'Switch to offline mode',
+                style: TextStyle(fontFamily: 'Inter', color: _onSurface),
+              ),
+            ],
+          ),
         ),
         const PopupMenuDivider(height: 1),
         const PopupMenuItem(
           value: 'signout',
-          child: Row(children: [
-            Icon(Icons.logout_rounded, size: 18, color: _terracotta),
-            SizedBox(width: 8),
-            Text('Sign out',
-                style: TextStyle(fontFamily: 'Inter', color: _terracotta)),
-          ]),
+          child: Row(
+            children: [
+              Icon(Icons.logout_rounded, size: 18, color: _terracotta),
+              SizedBox(width: 8),
+              Text(
+                'Sign out',
+                style: TextStyle(fontFamily: 'Inter', color: _terracotta),
+              ),
+            ],
+          ),
         ),
       ],
     );
@@ -619,11 +666,11 @@ class _EventFeed extends StatefulWidget {
   State<_EventFeed> createState() => _EventFeedState();
 }
 
-class _EventFeedState extends State<_EventFeed> with AutomaticKeepAliveClientMixin {
-  
+class _EventFeedState extends State<_EventFeed>
+    with AutomaticKeepAliveClientMixin {
   @override
   bool get wantKeepAlive => true;
-  
+
   List<Event> _filter(List<Event> events) {
     final upcoming = events.where((e) => !e.isPast).toList();
     final filtered = widget.category == 'All'
@@ -632,11 +679,11 @@ class _EventFeedState extends State<_EventFeed> with AutomaticKeepAliveClientMix
             final cat = widget.category == 'Exams'
                 ? 'exam'
                 : widget.category == 'Submissions'
-                    ? 'submission'
-                    : 'fest';
+                ? 'submission'
+                : 'fest';
             return e.category == cat;
           }).toList();
-          
+
     filtered.sort((a, b) => a.date.compareTo(b.date));
     return filtered;
   }
@@ -648,7 +695,8 @@ class _EventFeedState extends State<_EventFeed> with AutomaticKeepAliveClientMix
     return StreamBuilder<List<Event>>(
       stream: widget.stream,
       builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData) {
+        if (snapshot.connectionState == ConnectionState.waiting &&
+            !snapshot.hasData) {
           return const Center(
             child: CircularProgressIndicator(color: _primary),
           );

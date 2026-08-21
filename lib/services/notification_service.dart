@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/timezone.dart' as tz;
 import 'package:timezone/data/latest.dart' as tz_data;
@@ -12,7 +13,8 @@ class NotificationService {
 
     tz_data.initializeTimeZones();
 
-    const android = AndroidInitializationSettings('@mipmap/ic_launcher');
+    // Updated to match your generated launcher icon name
+    const android = AndroidInitializationSettings('@mipmap/launcher_icon');
     const ios = DarwinInitializationSettings(
       requestAlertPermission: true,
       requestBadgePermission: true,
@@ -22,6 +24,14 @@ class NotificationService {
     await _plugin.initialize(
       const InitializationSettings(android: android, iOS: ios),
     );
+
+    // Request permissions for Android 13+
+    if (Platform.isAndroid) {
+      final androidImpl = _plugin.resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin>();
+      await androidImpl?.requestNotificationsPermission();
+      await androidImpl?.requestExactAlarmsPermission();
+    }
 
     _initialized = true;
   }
@@ -56,18 +66,16 @@ class NotificationService {
 
   /// Schedules notifications at 1 day and 3 hours before the event.
   static Future<void> scheduleEventNotifications(Event event) async {
-    final oneDayBefore =
-        event.date.subtract(const Duration(days: 1));
-    final threeHoursBefore =
-        event.date.subtract(const Duration(hours: 3));
+    final oneDayBefore = event.date.subtract(const Duration(days: 1));
+    final threeHoursBefore = event.date.subtract(const Duration(hours: 3));
 
     final baseId = event.id.hashCode.abs();
 
     if (oneDayBefore.isAfter(DateTime.now())) {
       await scheduleNotification(
         id: baseId,
-        title: '⏰ Tomorrow: ${event.title}',
-        body: '${event.category.toUpperCase()} is due tomorrow!',
+        title: 'Tomorrow: ${event.category}',
+        body: '${event.title} is in ONE DAY',
         scheduledDate: oneDayBefore,
       );
     }
@@ -75,7 +83,7 @@ class NotificationService {
     if (threeHoursBefore.isAfter(DateTime.now())) {
       await scheduleNotification(
         id: baseId + 1,
-        title: '🔴 In 3 hours: ${event.title}',
+        title: 'In 3 hours: ${event.title}',
         body: '${event.category.toUpperCase()} is due in 3 hours!',
         scheduledDate: threeHoursBefore,
       );
