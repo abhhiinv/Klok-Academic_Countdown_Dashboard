@@ -1,7 +1,7 @@
 # Klok
 ### Academic Countdown Dashboard
 
-**Klok** is a modern, responsive Flutter application designed for college students (specifically tailored for KTU engineering batches) to track upcoming academic deadlines — exams, project submissions, lab evaluations, and fests — through an intuitive, urgency-based countdown dashboard.
+**Klok** is a modern, responsive Flutter application designed for college students to track upcoming academic deadlines — exams, project submissions, lab evaluations, and fests — through an intuitive, urgency-based countdown dashboard.
 
 ---
 

@@ -216,7 +216,7 @@ class _ArchiveCard extends StatelessWidget {
           child: Icon(
             _categoryIcon(event.category),
             color: _muted,
-            size: 20,
+            size: 30,
           ),
         ),
         title: Text(

@@ -211,7 +211,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Academic Countdown Dashboard\nfor KTU students.',
+                  'Academic Countdown Dashboard',
                   style: TextStyle(
                     fontFamily: 'Inter',
                     fontSize: 16,
@@ -310,7 +310,10 @@ class _SignInSection extends StatelessWidget {
         const _FeatureRow(
             icon: Icons.notifications_rounded,
             label: 'Reminders at 1 day and 3 hours'),
-        
+        const SizedBox(height: 12),
+        const _FeatureRow(
+            icon: Icons.wifi_off_rounded,
+            label: 'Separate Offline-Mode for privacy'),
         const SizedBox(height: 40),
 
         _GoogleSignInButton(isLoading: isLoading, onSignIn: onSignIn),
@@ -321,7 +324,7 @@ class _SignInSection extends StatelessWidget {
         TextButton(
           onPressed: isLoading ? null : onUseOffline,
           child: const Text(
-            'Use without signing in',
+            'Use without signing in (Offline-Mode)',
             style: TextStyle(
               fontFamily: 'Inter',
               fontSize: 14,
@@ -633,7 +636,7 @@ class _KlokTextField extends StatelessWidget {
         hintText: hint,
         hintStyle: TextStyle(
             fontFamily: 'Inter', color: _muted.withValues(alpha: 0.6)),
-        prefixIcon: Icon(icon, size: 20, color: _muted),
+        prefixIcon: Icon(icon, size: 30, color: _muted),
         filled: true,
         fillColor: _surfaceHigh,
         enabledBorder: OutlineInputBorder(

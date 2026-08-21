@@ -269,7 +269,7 @@ class _AddEventScreenState extends State<AddEventScreen> {
                 child: Row(
                   children: [
                     Icon(Icons.calendar_today_rounded,
-                        size: 20,
+                        size: 30,
                         color: _selectedDate != null ? _primary : _muted),
                     const SizedBox(width: 12),
                     Expanded(
@@ -375,7 +375,7 @@ class _AddEventScreenState extends State<AddEventScreen> {
       hintText: hint,
       hintStyle: TextStyle(
           fontFamily: 'Inter', color: _muted.withValues(alpha: 0.6)),
-      prefixIcon: Icon(icon, size: 20, color: _muted),
+      prefixIcon: Icon(icon, size: 30, color: _muted),
       filled: true,
       fillColor: _surfaceHigh,
       enabledBorder: OutlineInputBorder(
@@ -439,7 +439,7 @@ class _CategoryChip extends StatelessWidget {
         ),
         child: Column(
           children: [
-            Icon(icon, size: 20, color: selected ? _primary : _muted),
+            Icon(icon, size: 30, color: selected ? _primary : _muted),
             const SizedBox(height: 4),
             Text(
               label,

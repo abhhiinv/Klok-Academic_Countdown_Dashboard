@@ -596,7 +596,7 @@ class _JoinCreateSheetState extends State<_JoinCreateSheet> {
                       hintText: 'e.g. MCA 2026 Batch A',
                       hintStyle: TextStyle(
                           fontFamily: 'Inter', color: _muted.withValues(alpha: 0.6)),
-                      prefixIcon: const Icon(Icons.school_rounded, size: 20, color: _muted),
+                      prefixIcon: const Icon(Icons.school_rounded, size: 30, color: _muted),
                       filled: true,
                       fillColor: _surfaceHigh,
                       enabledBorder: OutlineInputBorder(
@@ -622,7 +622,7 @@ class _JoinCreateSheetState extends State<_JoinCreateSheet> {
                       hintText: 'e.g. XYZ123',
                       hintStyle: TextStyle(
                           fontFamily: 'Inter', color: _muted.withValues(alpha: 0.6)),
-                      prefixIcon: const Icon(Icons.key_rounded, size: 20, color: _muted),
+                      prefixIcon: const Icon(Icons.key_rounded, size: 30, color: _muted),
                       filled: true,
                       fillColor: _surfaceHigh,
                       enabledBorder: OutlineInputBorder(

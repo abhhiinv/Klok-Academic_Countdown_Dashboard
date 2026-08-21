@@ -147,7 +147,7 @@ class _EventCardState extends State<EventCard>
                                   ),
                                   child: Icon(
                                     _getCategoryIcon(widget.event.category),
-                                    size: 16,
+                                    size: 30,
                                     color: _muted,
                                   ),
                                 ),

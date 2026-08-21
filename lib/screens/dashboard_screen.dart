@@ -223,7 +223,7 @@ class _DashboardScreenState extends State<DashboardScreen>
             else
               Container(
                 margin: const EdgeInsets.fromLTRB(16, 10, 16, 0),
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
                 decoration: BoxDecoration(
                   color: _surfaceHigh,
                   borderRadius: BorderRadius.circular(10),
@@ -231,13 +231,13 @@ class _DashboardScreenState extends State<DashboardScreen>
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.wifi_off_rounded, size: 14, color: _terracotta),
+                    const Icon(Icons.wifi_off_rounded, size: 30, color: _terracotta),
                     const SizedBox(width: 8),
                     const Expanded(
                       child: Text(
-                        'Offline — personal events only',
+                        'Offline-Mode : Privacy first mode',
                         style: TextStyle(
-                            fontFamily: 'Inter', fontSize: 12, color: _onSurface),
+                            fontFamily: 'Inter', fontSize: 13, color: _onSurface),
                       ),
                     ),
                     GestureDetector(
@@ -396,7 +396,7 @@ class _JoinCodeChipState extends State<_JoinCodeChip> {
           children: [
             Icon(
               _copied ? Icons.check_rounded : Icons.key_rounded,
-              size: 14,
+              size: 30,
               color: _copied ? _primary : _muted,
             ),
             const SizedBox(width: 6),
