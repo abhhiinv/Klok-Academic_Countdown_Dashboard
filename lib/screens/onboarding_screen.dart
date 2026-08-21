@@ -3,7 +3,19 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../services/auth_service.dart';
 import '../services/firestore_service.dart';
 import '../services/local_storage_service.dart';
+import 'classes_screen.dart';
 import 'dashboard_screen.dart';
+
+// ── Design tokens ────────────────────────────────────────────────────────
+const _bg = Color(0xFF1A1714);
+const _surfaceHigh = Color(0xFF2C2820);
+const _border = Color(0xFF3A3328);
+const _primary = Color(0xFFF0A500);
+const _onPrimary = Color(0xFF1A1714);
+const _onSurface = Color(0xFFF5EFE6);
+const _muted = Color(0xFF9C8E7E);
+const _terracotta = Color(0xFFE8956D);
+const _primaryContainer = Color(0xFF3D2E00);
 
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({super.key});
@@ -37,8 +49,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
     super.initState();
     _fadeCtrl = AnimationController(
         vsync: this, duration: const Duration(milliseconds: 600));
-    _fadeAnim =
-        CurvedAnimation(parent: _fadeCtrl, curve: Curves.easeOut);
+    _fadeAnim = CurvedAnimation(parent: _fadeCtrl, curve: Curves.easeOut);
     _fadeCtrl.forward();
   }
 
@@ -56,7 +67,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
-          builder: (_) => DashboardScreen(user: null, classId: null),
+          builder: (_) => const DashboardScreen(user: null, classId: null),
         ),
       );
     }
@@ -82,22 +93,19 @@ class _OnboardingScreenState extends State<OnboardingScreen>
       final user = cred.user!;
       await _firestoreService.createOrUpdateUser(user);
 
-      // Check if user already has a class
-      final userData = await _firestoreService.getUser(user.uid);
-      final classId = userData?['classId'] as String?;
-      if (classId != null && classId.isNotEmpty) {
+      // Check if user already has classes → go straight to ClassesScreen
+      final classes = await _firestoreService.getUserClasses(user.uid);
+      if (classes.isNotEmpty) {
         if (mounted) {
           Navigator.pushReplacement(
             context,
-            MaterialPageRoute(
-              builder: (_) =>
-                  DashboardScreen(user: user, classId: classId),
-            ),
+            MaterialPageRoute(builder: (_) => ClassesScreen(user: user)),
           );
         }
         return;
       }
 
+      // No classes yet → show class setup step
       setState(() {
         _signedInUser = user;
         _showClassSetup = true;
@@ -118,14 +126,12 @@ class _OnboardingScreenState extends State<OnboardingScreen>
 
     setState(() => _isLoading = true);
     try {
-      final group = await _firestoreService.createClass(
-          name, _signedInUser!.uid);
+      await _firestoreService.createClass(name, _signedInUser!.uid);
       if (mounted) {
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
-            builder: (_) =>
-                DashboardScreen(user: _signedInUser!, classId: group.id),
+            builder: (_) => ClassesScreen(user: _signedInUser!),
           ),
         );
       }
@@ -156,8 +162,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
-            builder: (_) =>
-                DashboardScreen(user: _signedInUser!, classId: group.id),
+            builder: (_) => ClassesScreen(user: _signedInUser!),
           ),
         );
       }
@@ -171,15 +176,13 @@ class _OnboardingScreenState extends State<OnboardingScreen>
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     return Scaffold(
-      backgroundColor: theme.colorScheme.surface,
+      backgroundColor: _bg,
       body: FadeTransition(
         opacity: _fadeAnim,
         child: SafeArea(
           child: SingleChildScrollView(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 28, vertical: 48),
+            padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 48),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -188,28 +191,31 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                   width: 56,
                   height: 56,
                   decoration: BoxDecoration(
-                    color: theme.colorScheme.primary,
+                    color: _primary,
                     borderRadius: BorderRadius.circular(16),
                   ),
                   child: const Icon(Icons.access_time_rounded,
-                      color: Colors.white, size: 30),
+                      color: _onPrimary, size: 30),
                 ),
                 const SizedBox(height: 32),
 
-                Text(
+                const Text(
                   'Klok',
-                  style: theme.textTheme.displayMedium?.copyWith(
+                  style: TextStyle(
                     fontFamily: 'Inter',
+                    fontSize: 40,
                     fontWeight: FontWeight.w800,
                     letterSpacing: -1.5,
-                    color: theme.colorScheme.onSurface,
+                    color: _onSurface,
                   ),
                 ),
                 const SizedBox(height: 8),
                 Text(
                   'Academic Countdown Dashboard\nfor KTU students.',
-                  style: theme.textTheme.bodyLarge?.copyWith(
-                    color: theme.colorScheme.onSurface.withValues(alpha: 0.55),
+                  style: TextStyle(
+                    fontFamily: 'Inter',
+                    fontSize: 16,
+                    color: _muted.withValues(alpha: 0.8),
                     height: 1.5,
                   ),
                 ),
@@ -241,19 +247,25 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: Colors.red.shade50,
+                      color: _terracotta.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                        color: _terracotta.withValues(alpha: 0.3),
+                      ),
                     ),
                     child: Row(
                       children: [
-                        Icon(Icons.error_outline,
-                            color: Colors.red.shade700, size: 18),
+                        const Icon(Icons.error_outline,
+                            color: _terracotta, size: 18),
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
                             _errorMessage!,
-                            style: TextStyle(
-                                color: Colors.red.shade700, fontSize: 13),
+                            style: const TextStyle(
+                              fontFamily: 'Inter',
+                              color: _terracotta,
+                              fontSize: 13,
+                            ),
                           ),
                         ),
                       ],
@@ -273,44 +285,48 @@ class _SignInSection extends StatelessWidget {
   final bool isLoading;
   final VoidCallback onSignIn;
   final VoidCallback onUseOffline;
-  const _SignInSection(
-      {required this.isLoading,
-      required this.onSignIn,
-      required this.onUseOffline});
+  
+  const _SignInSection({
+    required this.isLoading,
+    required this.onSignIn,
+    required this.onUseOffline,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _FeatureRow(
+        const _FeatureRow(
             icon: Icons.timer_rounded, label: 'Live countdown for every event'),
         const SizedBox(height: 12),
-        _FeatureRow(
+        const _FeatureRow(
             icon: Icons.group_rounded,
             label: 'Shared class feed with join codes (requires sign-in)'),
         const SizedBox(height: 12),
-        _FeatureRow(
+        const _FeatureRow(
             icon: Icons.lock_rounded, label: 'Private personal event space'),
         const SizedBox(height: 12),
-        _FeatureRow(
+        const _FeatureRow(
             icon: Icons.notifications_rounded,
             label: 'Reminders at 1 day and 3 hours'),
-
+        
         const SizedBox(height: 40),
 
         _GoogleSignInButton(isLoading: isLoading, onSignIn: onSignIn),
-
+        
         const SizedBox(height: 14),
 
         // Offline / guest option
         TextButton(
           onPressed: isLoading ? null : onUseOffline,
-          child: Text(
+          child: const Text(
             'Use without signing in',
             style: TextStyle(
+              fontFamily: 'Inter',
               fontSize: 14,
-              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
+              color: _muted,
+              fontWeight: FontWeight.w600,
             ),
           ),
         ),
@@ -332,23 +348,19 @@ class _FeatureRow extends StatelessWidget {
           width: 36,
           height: 36,
           decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.primaryContainer,
+            color: _primaryContainer,
             borderRadius: BorderRadius.circular(10),
           ),
-          child: Icon(icon,
-              size: 18,
-              color: Theme.of(context).colorScheme.primary),
+          child: Icon(icon, size: 18, color: _primary),
         ),
         const SizedBox(width: 14),
         Expanded(
           child: Text(
             label,
-            style: TextStyle(
+            style: const TextStyle(
+              fontFamily: 'Inter',
               fontSize: 14,
-              color: Theme.of(context)
-                  .colorScheme
-                  .onSurface
-                  .withValues(alpha: 0.75),
+              color: _onSurface,
             ),
           ),
         ),
@@ -360,8 +372,7 @@ class _FeatureRow extends StatelessWidget {
 class _GoogleSignInButton extends StatelessWidget {
   final bool isLoading;
   final VoidCallback onSignIn;
-  const _GoogleSignInButton(
-      {required this.isLoading, required this.onSignIn});
+  const _GoogleSignInButton({required this.isLoading, required this.onSignIn});
 
   @override
   Widget build(BuildContext context) {
@@ -370,10 +381,9 @@ class _GoogleSignInButton extends StatelessWidget {
       child: ElevatedButton(
         onPressed: isLoading ? null : onSignIn,
         style: ElevatedButton.styleFrom(
-          backgroundColor: Theme.of(context).colorScheme.primary,
-          foregroundColor: Colors.white,
-          shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(14)),
+          backgroundColor: _primary,
+          foregroundColor: _onPrimary,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           elevation: 0,
         ),
         child: isLoading
@@ -381,17 +391,20 @@ class _GoogleSignInButton extends StatelessWidget {
                 width: 22,
                 height: 22,
                 child: CircularProgressIndicator(
-                    color: Colors.white, strokeWidth: 2.5),
+                    color: _onPrimary, strokeWidth: 2.5),
               )
             : const Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.g_mobiledata_rounded, size: 26),
-                  SizedBox(width: 10),
+                  Icon(Icons.g_mobiledata_rounded, size: 28),
+                  SizedBox(width: 8),
                   Text(
                     'Continue with Google',
                     style: TextStyle(
-                        fontSize: 15, fontWeight: FontWeight.w600),
+                      fontFamily: 'Inter',
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                 ],
               ),
@@ -423,43 +436,53 @@ class _ClassSetupSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Text(
           'Hey $userName 👋',
-          style: theme.textTheme.titleLarge?.copyWith(
+          style: const TextStyle(
+            fontFamily: 'Inter',
+            fontSize: 22,
             fontWeight: FontWeight.w700,
+            color: _onSurface,
           ),
         ),
         const SizedBox(height: 4),
-        Text(
+        const Text(
           'Set up your class to get started.',
           style: TextStyle(
-              color: theme.colorScheme.onSurface.withValues(alpha: 0.55)),
+            fontFamily: 'Inter',
+            color: _muted,
+            fontSize: 15,
+          ),
         ),
         const SizedBox(height: 24),
 
         // Toggle
         Container(
           decoration: BoxDecoration(
-            color: theme.colorScheme.surfaceContainerHighest,
+            color: _surfaceHigh,
             borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: _border),
           ),
           padding: const EdgeInsets.all(4),
           child: Row(
             children: [
-              Expanded(child: _TabButton(
-                label: 'Create class',
-                selected: isCreating,
-                onTap: () => onToggle(true),
-              )),
-              Expanded(child: _TabButton(
-                label: 'Join class',
-                selected: !isCreating,
-                onTap: () => onToggle(false),
-              )),
+              Expanded(
+                child: _TabButton(
+                  label: 'Create class',
+                  selected: isCreating,
+                  onTap: () => onToggle(true),
+                ),
+              ),
+              Expanded(
+                child: _TabButton(
+                  label: 'Join class',
+                  selected: !isCreating,
+                  onTap: () => onToggle(false),
+                ),
+              ),
             ],
           ),
         ),
@@ -478,8 +501,8 @@ class _ClassSetupSection extends StatelessWidget {
             child: ElevatedButton(
               onPressed: isLoading ? null : onCreate,
               style: ElevatedButton.styleFrom(
-                backgroundColor: theme.colorScheme.primary,
-                foregroundColor: Colors.white,
+                backgroundColor: _primary,
+                foregroundColor: _onPrimary,
                 shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12)),
                 elevation: 0,
@@ -489,10 +512,15 @@ class _ClassSetupSection extends StatelessWidget {
                       width: 20,
                       height: 20,
                       child: CircularProgressIndicator(
-                          color: Colors.white, strokeWidth: 2))
-                  : const Text('Create Class',
+                          color: _onPrimary, strokeWidth: 2))
+                  : const Text(
+                      'Create Class',
                       style: TextStyle(
-                          fontSize: 15, fontWeight: FontWeight.w600)),
+                        fontFamily: 'Inter',
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
             ),
           ),
         ] else ...[
@@ -509,8 +537,8 @@ class _ClassSetupSection extends StatelessWidget {
             child: ElevatedButton(
               onPressed: isLoading ? null : onJoin,
               style: ElevatedButton.styleFrom(
-                backgroundColor: theme.colorScheme.primary,
-                foregroundColor: Colors.white,
+                backgroundColor: _primary,
+                foregroundColor: _onPrimary,
                 shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12)),
                 elevation: 0,
@@ -520,10 +548,15 @@ class _ClassSetupSection extends StatelessWidget {
                       width: 20,
                       height: 20,
                       child: CircularProgressIndicator(
-                          color: Colors.white, strokeWidth: 2))
-                  : const Text('Join Class',
+                          color: _onPrimary, strokeWidth: 2))
+                  : const Text(
+                      'Join Class',
                       style: TextStyle(
-                          fontSize: 15, fontWeight: FontWeight.w600)),
+                        fontFamily: 'Inter',
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
             ),
           ),
         ],
@@ -536,8 +569,12 @@ class _TabButton extends StatelessWidget {
   final String label;
   final bool selected;
   final VoidCallback onTap;
-  const _TabButton(
-      {required this.label, required this.selected, required this.onTap});
+  
+  const _TabButton({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -547,32 +584,20 @@ class _TabButton extends StatelessWidget {
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.symmetric(vertical: 10),
         decoration: BoxDecoration(
-          color: selected
-              ? Theme.of(context).colorScheme.surface
-              : Colors.transparent,
-          borderRadius: BorderRadius.circular(9),
-          boxShadow: selected
-              ? [
-                  BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.08),
-                      blurRadius: 8,
-                      offset: const Offset(0, 2))
-                ]
-              : [],
+          color: selected ? _primaryContainer : Colors.transparent,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: selected ? _primary.withValues(alpha: 0.3) : Colors.transparent,
+          ),
         ),
         child: Center(
           child: Text(
             label,
             style: TextStyle(
+              fontFamily: 'Inter',
               fontSize: 13,
-              fontWeight:
-                  selected ? FontWeight.w600 : FontWeight.w400,
-              color: selected
-                  ? Theme.of(context).colorScheme.primary
-                  : Theme.of(context)
-                      .colorScheme
-                      .onSurface
-                      .withValues(alpha: 0.5),
+              fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+              color: selected ? _primary : _muted,
             ),
           ),
         ),
@@ -601,15 +626,23 @@ class _KlokTextField extends StatelessWidget {
     return TextField(
       controller: controller,
       textCapitalization: textCapitalization,
+      style: const TextStyle(fontFamily: 'Inter', color: _onSurface),
       decoration: InputDecoration(
         labelText: label,
+        labelStyle: const TextStyle(fontFamily: 'Inter', color: _muted),
         hintText: hint,
-        prefixIcon: Icon(icon, size: 20),
+        hintStyle: TextStyle(
+            fontFamily: 'Inter', color: _muted.withValues(alpha: 0.6)),
+        prefixIcon: Icon(icon, size: 20, color: _muted),
         filled: true,
-        fillColor: Theme.of(context).colorScheme.surfaceContainerHighest,
-        border: OutlineInputBorder(
+        fillColor: _surfaceHigh,
+        enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide.none,
+          borderSide: const BorderSide(color: _border),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: _primary, width: 1.5),
         ),
         contentPadding:
             const EdgeInsets.symmetric(horizontal: 16, vertical: 14),

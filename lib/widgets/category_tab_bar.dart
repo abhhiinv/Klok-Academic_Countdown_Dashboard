@@ -1,5 +1,12 @@
 import 'package:flutter/material.dart';
 
+const _border = Color(0xFF3A3328);
+const _surfaceHigh = Color(0xFF2C2820);
+const _primary = Color(0xFFF0A500);
+const _onPrimary = Color(0xFF1A1714);
+const _muted = Color(0xFF9C8E7E);
+const _onSurface = Color(0xFFF5EFE6);
+
 /// A horizontal scrollable tab bar for filtering event categories.
 class CategoryTabBar extends StatelessWidget {
   final String selected;
@@ -23,36 +30,29 @@ class CategoryTabBar extends StatelessWidget {
           final isSelected = cat == selected;
           return Padding(
             padding: const EdgeInsets.only(right: 8),
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
-              curve: Curves.easeInOut,
-              child: GestureDetector(
-                onTap: () => onSelected(cat),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 16, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: isSelected
-                        ? Theme.of(context).colorScheme.primary
-                        : Theme.of(context)
-                            .colorScheme
-                            .surfaceContainerHighest,
-                    borderRadius: BorderRadius.circular(20),
+            child: GestureDetector(
+              onTap: () => onSelected(cat),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 180),
+                curve: Curves.easeOut,
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 7),
+                decoration: BoxDecoration(
+                  color: isSelected ? _primary : _surfaceHigh,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: isSelected ? _primary : _border,
                   ),
-                  child: Text(
-                    cat,
-                    style: TextStyle(
-                      fontFamily: 'Inter',
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: isSelected
-                          ? Theme.of(context).colorScheme.onPrimary
-                          : Theme.of(context)
-                              .colorScheme
-                              .onSurface
-                              .withValues(alpha: 0.6),
-                      letterSpacing: 0.2,
-                    ),
+                ),
+                child: Text(
+                  cat,
+                  style: TextStyle(
+                    fontFamily: 'Inter',
+                    fontSize: 13,
+                    fontWeight:
+                        isSelected ? FontWeight.w700 : FontWeight.w500,
+                    color: isSelected ? _onPrimary : _muted,
+                    letterSpacing: 0.1,
                   ),
                 ),
               ),

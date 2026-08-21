@@ -23,8 +23,52 @@ class FirestoreService {
     return doc.data();
   }
 
-  Future<void> setUserClassId(String uid, String classId) async {
-    await _db.collection('users').doc(uid).update({'classId': classId});
+  /// Adds a classId to the user's classIds array (supports multiple classes).
+  Future<void> addUserClassId(String uid, String classId) async {
+    await _db.collection('users').doc(uid).update({
+      'classIds': FieldValue.arrayUnion([classId]),
+    });
+  }
+
+  /// Returns all ClassGroups the user belongs to.
+  /// Handles backward-compatibility: migrates old single `classId` field → `classIds` array.
+  Future<List<ClassGroup>> getUserClasses(String uid) async {
+    final userData = await getUser(uid);
+    final List<String> ids = [];
+
+    final rawIds = userData?['classIds'];
+    if (rawIds != null) {
+      ids.addAll(List<String>.from(rawIds as List));
+    } else {
+      // Migrate legacy single classId → classIds array
+      final legacyId = userData?['classId'] as String?;
+      if (legacyId != null && legacyId.isNotEmpty) {
+        ids.add(legacyId);
+        await _db.collection('users').doc(uid).update({
+          'classIds': ids,
+          'classId': FieldValue.delete(),
+        });
+      }
+    }
+
+    if (ids.isEmpty) return [];
+    final futures = ids.map((id) => getClass(id));
+    final groups = await Future.wait(futures);
+    return groups.whereType<ClassGroup>().toList();
+  }
+
+  /// Removes the user from a class group and their classIds list.
+  Future<void> leaveClass(String uid, String classId) async {
+    await _db.collection('users').doc(uid).update({
+      'classIds': FieldValue.arrayRemove([classId]),
+    });
+    // Remove uid from the class members list
+    final classDoc = await _db.collection('classes').doc(classId).get();
+    if (classDoc.exists) {
+      final members = List<String>.from(classDoc['members'] as List);
+      members.remove(uid);
+      await classDoc.reference.update({'members': members});
+    }
   }
 
   // ─── Class Group ──────────────────────────────────────────────────────────
@@ -37,7 +81,7 @@ class FirestoreService {
       'adminUID': adminUID,
       'members': [adminUID],
     });
-    await setUserClassId(adminUID, docRef.id);
+    await addUserClassId(adminUID, docRef.id);
     return ClassGroup(
       id: docRef.id,
       name: name,
@@ -62,7 +106,7 @@ class FirestoreService {
       members.add(uid);
       await doc.reference.update({'members': members});
     }
-    await setUserClassId(uid, doc.id);
+    await addUserClassId(uid, doc.id);
 
     return ClassGroup.fromFirestore(doc.data(), doc.id);
   }

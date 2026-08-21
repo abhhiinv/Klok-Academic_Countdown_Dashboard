@@ -2,8 +2,18 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../models/event.dart';
 import '../services/firestore_service.dart';
-
 import '../utils/date_utils.dart' as du;
+
+// ── Design tokens ────────────────────────────────────────────────────────
+const _bg = Color(0xFF1A1714);
+const _surfaceHigh = Color(0xFF2C2820);
+const _border = Color(0xFF3A3328);
+const _primary = Color(0xFFF0A500);
+const _onPrimary = Color(0xFF1A1714);
+const _onSurface = Color(0xFFF5EFE6);
+const _muted = Color(0xFF9C8E7E);
+const _terracotta = Color(0xFFE8956D);
+const _primaryContainer = Color(0xFF3D2E00);
 
 class ArchiveScreen extends StatelessWidget {
   final User user;
@@ -19,35 +29,42 @@ class ArchiveScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final firestoreService = FirestoreService();
 
     return DefaultTabController(
       length: 2,
       child: Scaffold(
-        backgroundColor: theme.colorScheme.surface,
+        backgroundColor: _bg,
         appBar: AppBar(
           backgroundColor: Colors.transparent,
           elevation: 0,
+          iconTheme: const IconThemeData(color: _onSurface),
           title: const Text(
             'Archive',
             style: TextStyle(
               fontFamily: 'Inter',
               fontWeight: FontWeight.w700,
               letterSpacing: -0.3,
+              color: _onSurface,
             ),
           ),
-          bottom: TabBar(
-            labelColor: theme.colorScheme.primary,
-            unselectedLabelColor:
-                theme.colorScheme.onSurface.withValues(alpha: 0.5),
-            indicatorColor: theme.colorScheme.primary,
+          bottom: const TabBar(
+            labelColor: _primary,
+            unselectedLabelColor: _muted,
+            indicatorColor: _primary,
             indicatorSize: TabBarIndicatorSize.label,
-            labelStyle: const TextStyle(
-                fontFamily: 'Inter',
-                fontWeight: FontWeight.w700,
-                fontSize: 14),
-            tabs: const [
+            dividerColor: _border,
+            labelStyle: TextStyle(
+              fontFamily: 'Inter',
+              fontWeight: FontWeight.w700,
+              fontSize: 14,
+            ),
+            unselectedLabelStyle: TextStyle(
+              fontFamily: 'Inter',
+              fontWeight: FontWeight.w500,
+              fontSize: 14,
+            ),
+            tabs: [
               Tab(text: 'Class'),
               Tab(text: 'Personal'),
             ],
@@ -64,8 +81,7 @@ class ArchiveScreen extends StatelessWidget {
             ),
             // Personal archive
             _ArchiveFeed(
-              stream:
-                  firestoreService.personalEventsStream(user.uid),
+              stream: firestoreService.personalEventsStream(user.uid),
               isAdmin: true,
               onDelete: (event) =>
                   firestoreService.deletePersonalEvent(user.uid, event.id),
@@ -90,13 +106,22 @@ class _ArchiveFeed extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
     return StreamBuilder<List<Event>>(
       stream: stream,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
+          return const Center(
+            child: CircularProgressIndicator(color: _primary),
+          );
+        }
+        
+        if (snapshot.hasError) {
+          return Center(
+            child: Text(
+              'Error loading archive',
+              style: const TextStyle(fontFamily: 'Inter', color: _terracotta),
+            ),
+          );
         }
 
         final pastEvents = (snapshot.data ?? [])
@@ -112,14 +137,15 @@ class _ArchiveFeed extends StatelessWidget {
                 Icon(
                   Icons.inventory_2_rounded,
                   size: 56,
-                  color: theme.colorScheme.onSurface.withValues(alpha: 0.2),
+                  color: _muted.withValues(alpha: 0.3),
                 ),
                 const SizedBox(height: 16),
                 Text(
                   'No past events yet.',
                   style: TextStyle(
+                    fontFamily: 'Inter',
                     fontSize: 15,
-                    color: theme.colorScheme.onSurface.withValues(alpha: 0.4),
+                    color: _muted.withValues(alpha: 0.8),
                   ),
                 ),
               ],
@@ -128,7 +154,7 @@ class _ArchiveFeed extends StatelessWidget {
         }
 
         return ListView.builder(
-          padding: const EdgeInsets.all(20),
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
           itemCount: pastEvents.length,
           itemBuilder: (context, index) {
             final event = pastEvents[index];
@@ -170,26 +196,26 @@ class _ArchiveCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     return Container(
-      margin: const EdgeInsets.only(bottom: 10),
+      margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.6),
+        color: _surfaceHigh,
         borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: _border),
       ),
       child: ListTile(
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         leading: Container(
-          width: 40,
-          height: 40,
+          width: 44,
+          height: 44,
           decoration: BoxDecoration(
-            color: Colors.grey.withValues(alpha: 0.12),
+            color: _bg,
             borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: _border),
           ),
           child: Icon(
             _categoryIcon(event.category),
-            color: Colors.grey,
+            color: _muted,
             size: 20,
           ),
         ),
@@ -198,41 +224,73 @@ class _ArchiveCard extends StatelessWidget {
           style: TextStyle(
             fontFamily: 'Inter',
             fontWeight: FontWeight.w600,
-            fontSize: 14,
-            color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
+            fontSize: 15,
+            color: _onSurface.withValues(alpha: 0.9),
           ),
         ),
         subtitle: Padding(
           padding: const EdgeInsets.only(top: 4),
           child: Text(
             du.formatEventDate(event.date),
-            style: TextStyle(
-              fontSize: 12,
-              color: theme.colorScheme.onSurface.withValues(alpha: 0.4),
+            style: const TextStyle(
+              fontFamily: 'Inter',
+              fontSize: 13,
+              color: _muted,
             ),
           ),
         ),
         trailing: isAdmin
             ? IconButton(
-                icon: Icon(Icons.delete_outline_rounded,
-                    color: Colors.grey.shade400, size: 20),
+                icon: const Icon(Icons.delete_outline_rounded,
+                    color: _terracotta, size: 22),
                 onPressed: () async {
                   final ok = await showDialog<bool>(
                     context: context,
                     builder: (ctx) => AlertDialog(
-                      title: const Text('Delete?'),
+                      backgroundColor: _surfaceHigh,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        side: const BorderSide(color: _border),
+                      ),
+                      title: const Text(
+                        'Delete?',
+                        style: TextStyle(
+                          fontFamily: 'Inter',
+                          color: _onSurface,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
                       content: const Text(
-                          'Remove this event from archive?'),
+                        'Remove this event from archive?',
+                        style: TextStyle(
+                          fontFamily: 'Inter',
+                          color: _muted,
+                        ),
+                      ),
                       actions: [
                         TextButton(
                           onPressed: () => Navigator.pop(ctx, false),
-                          child: const Text('Cancel'),
+                          child: const Text(
+                            'Cancel',
+                            style: TextStyle(
+                              fontFamily: 'Inter',
+                              color: _muted,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
                         ),
                         TextButton(
                           onPressed: () => Navigator.pop(ctx, true),
                           style: TextButton.styleFrom(
-                              foregroundColor: Colors.red),
-                          child: const Text('Delete'),
+                            foregroundColor: _terracotta,
+                          ),
+                          child: const Text(
+                            'Delete',
+                            style: TextStyle(
+                              fontFamily: 'Inter',
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
                         ),
                       ],
                     ),

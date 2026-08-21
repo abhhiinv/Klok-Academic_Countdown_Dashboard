@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../models/event.dart';
 import '../models/class_group.dart';
@@ -11,6 +12,17 @@ import '../widgets/category_tab_bar.dart';
 import 'add_event_screen.dart';
 import 'archive_screen.dart';
 import 'onboarding_screen.dart';
+
+// ── Design tokens ────────────────────────────────────────────────────────
+const _bg = Color(0xFF1A1714);
+const _surfaceHigh = Color(0xFF2C2820);
+const _border = Color(0xFF3A3328);
+const _primary = Color(0xFFF0A500);
+const _onPrimary = Color(0xFF1A1714);
+const _onSurface = Color(0xFFF5EFE6);
+const _muted = Color(0xFF9C8E7E);
+const _terracotta = Color(0xFFE8956D);
+const _primaryContainer = Color(0xFF3D2E00);
 
 class DashboardScreen extends StatefulWidget {
   /// null when in offline/guest mode
@@ -95,7 +107,7 @@ class _DashboardScreenState extends State<DashboardScreen>
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
-          builder: (_) => DashboardScreen(user: null, classId: null),
+          builder: (_) => const DashboardScreen(user: null, classId: null),
         ),
       );
     }
@@ -114,56 +126,56 @@ class _DashboardScreenState extends State<DashboardScreen>
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
     return Scaffold(
-      backgroundColor: theme.colorScheme.surface,
+      backgroundColor: _bg,
       body: SafeArea(
         child: Column(
           children: [
             // ── App Bar ──────────────────────────────────────────────
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 4, 0),
+              padding: const EdgeInsets.fromLTRB(20, 12, 8, 0),
               child: Row(
                 children: [
+                  // Logo
                   Container(
-                    width: 32,
-                    height: 32,
+                    width: 34,
+                    height: 34,
                     decoration: BoxDecoration(
-                      color: theme.colorScheme.primary,
-                      borderRadius: BorderRadius.circular(9),
+                      color: _primary,
+                      borderRadius: BorderRadius.circular(10),
                     ),
                     child: const Icon(Icons.access_time_rounded,
-                        color: Colors.white, size: 18),
+                        color: _onPrimary, size: 18),
                   ),
                   const SizedBox(width: 10),
                   Text(
-                    'Klok',
-                    style: theme.textTheme.titleLarge?.copyWith(
+                    _isOffline ? 'Personal' : (_classGroup?.name ?? 'Klok'),
+                    style: const TextStyle(
                       fontFamily: 'Inter',
                       fontWeight: FontWeight.w800,
+                      fontSize: 20,
                       letterSpacing: -0.5,
+                      color: _onSurface,
                     ),
                   ),
                   const Spacer(),
 
-                  // Archive button — only available when signed in (has classId)
+                  // Archive
                   if (!_isOffline)
                     IconButton(
-                      icon: const Icon(Icons.archive_rounded),
+                      icon: const Icon(Icons.archive_outlined,
+                          color: _muted, size: 22),
                       tooltip: 'Archive',
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => ArchiveScreen(
-                              user: widget.user!,
-                              classId: widget.classId!,
-                              isAdmin: _isAdmin,
-                            ),
+                      onPressed: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => ArchiveScreen(
+                            user: widget.user!,
+                            classId: widget.classId!,
+                            isAdmin: _isAdmin,
                           ),
-                        );
-                      },
+                        ),
+                      ),
                     ),
 
                   // Account menu
@@ -173,8 +185,6 @@ class _DashboardScreenState extends State<DashboardScreen>
                           user: widget.user!,
                           classGroup: _classGroup,
                           onSignOut: _signOut,
-                          onShowCode: () =>
-                              _showClassCode(context, _classGroup!.classCode),
                           onGoOffline: _goOffline,
                         ),
 
@@ -183,60 +193,62 @@ class _DashboardScreenState extends State<DashboardScreen>
               ),
             ),
 
-            // ── Tab Bar ───────────────────────────────────────────────
+            // ── Tab Bar (online) / Offline banner ─────────────────────
             if (!_isOffline)
-              TabBar(
-                controller: _tabController,
-                labelColor: theme.colorScheme.primary,
-                unselectedLabelColor:
-                    theme.colorScheme.onSurface.withValues(alpha: 0.5),
-                indicatorColor: theme.colorScheme.primary,
-                indicatorSize: TabBarIndicatorSize.label,
-                labelStyle: const TextStyle(
-                  fontFamily: 'Inter',
-                  fontWeight: FontWeight.w700,
-                  fontSize: 14,
+              Padding(
+                padding: const EdgeInsets.fromLTRB(8, 6, 8, 0),
+                child: TabBar(
+                  controller: _tabController,
+                  labelColor: _primary,
+                  unselectedLabelColor: _muted,
+                  indicatorColor: _primary,
+                  indicatorSize: TabBarIndicatorSize.label,
+                  dividerColor: _border,
+                  labelStyle: const TextStyle(
+                    fontFamily: 'Inter',
+                    fontWeight: FontWeight.w700,
+                    fontSize: 14,
+                  ),
+                  unselectedLabelStyle: const TextStyle(
+                    fontFamily: 'Inter',
+                    fontWeight: FontWeight.w500,
+                    fontSize: 14,
+                  ),
+                  tabs: [
+                    Tab(text: _classGroup?.name ?? 'Class'),
+                    const Tab(text: 'Personal'),
+                  ],
                 ),
-                tabs: [
-                  Tab(text: _classGroup?.name ?? 'Class'),
-                  const Tab(text: 'Personal'),
-                ],
               )
             else
-              // Offline: show a slim banner explaining state
               Container(
-                margin: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                margin: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
                 decoration: BoxDecoration(
-                  color: theme.colorScheme.surfaceContainerHighest,
+                  color: _surfaceHigh,
                   borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: _border),
                 ),
                 child: Row(
                   children: [
-                    Icon(Icons.wifi_off_rounded,
-                        size: 16,
-                        color: theme.colorScheme.onSurface
-                            .withValues(alpha: 0.5)),
+                    const Icon(Icons.wifi_off_rounded, size: 14, color: _terracotta),
                     const SizedBox(width: 8),
-                    Expanded(
+                    const Expanded(
                       child: Text(
-                        'Offline mode — personal events only',
+                        'Offline — personal events only',
                         style: TextStyle(
-                          fontSize: 12,
-                          color: theme.colorScheme.onSurface
-                              .withValues(alpha: 0.55),
-                        ),
+                            fontFamily: 'Inter', fontSize: 12, color: _onSurface),
                       ),
                     ),
                     GestureDetector(
                       onTap: _signInForClass,
-                      child: Text(
+                      child: const Text(
                         'Sign in',
                         style: TextStyle(
+                          fontFamily: 'Inter',
                           fontSize: 12,
                           fontWeight: FontWeight.w700,
-                          color: theme.colorScheme.primary,
+                          color: _primary,
                         ),
                       ),
                     ),
@@ -244,8 +256,29 @@ class _DashboardScreenState extends State<DashboardScreen>
                 ),
               ),
 
-            // ── Category Filter ────────────────────────────────────────
-            const SizedBox(height: 12),
+            // ── Join code chip (class tab only) ───────────────────────
+            if (!_isOffline && _classGroup != null)
+              AnimatedBuilder(
+                animation: _tabController,
+                builder: (context, _) {
+                  final onClassTab = _tabController.index == 0;
+                  return AnimatedCrossFade(
+                    duration: const Duration(milliseconds: 200),
+                    crossFadeState: onClassTab
+                        ? CrossFadeState.showFirst
+                        : CrossFadeState.showSecond,
+                    firstChild: Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 10, 20, 0),
+                      child: _JoinCodeChip(code: _classGroup!.classCode),
+                    ),
+                    secondChild: const SizedBox.shrink(),
+                  );
+                },
+              ),
+
+            const SizedBox(height: 14),
+
+            // ── Category filter ────────────────────────────────────────
             CategoryTabBar(
               selected: _selectedCategory,
               onSelected: (cat) => setState(() => _selectedCategory = cat),
@@ -263,7 +296,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                         await _localService.deletePersonalEvent(event.id);
                         _refreshLocalEvents();
                       },
-                      emptyMessage: 'No personal events.\nAdd one!',
+                      emptyMessage: 'No personal events.\nTap + to add one.',
                     )
                   : TabBarView(
                       controller: _tabController,
@@ -275,7 +308,8 @@ class _DashboardScreenState extends State<DashboardScreen>
                           isAdmin: _isAdmin,
                           onDelete: (event) => _firestoreService
                               .deleteClassEvent(widget.classId!, event.id),
-                          emptyMessage: 'No upcoming class events.\nAdd one!',
+                          emptyMessage:
+                              'No upcoming class events.\nTap + to add one.',
                         ),
                         _EventFeed(
                           stream: _firestoreService
@@ -285,7 +319,8 @@ class _DashboardScreenState extends State<DashboardScreen>
                           onDelete: (event) =>
                               _firestoreService.deletePersonalEvent(
                                   widget.user!.uid, event.id),
-                          emptyMessage: 'No personal events.\nAdd one!',
+                          emptyMessage:
+                              'No personal events.\nTap + to add one.',
                         ),
                       ],
                     ),
@@ -306,48 +341,86 @@ class _DashboardScreenState extends State<DashboardScreen>
               ),
             ),
           );
-          // Refresh local events if offline after returning from add screen
           if (_isOffline) _refreshLocalEvents();
         },
-        icon: const Icon(Icons.add_rounded),
+        icon: const Icon(Icons.add_rounded, color: _onPrimary),
         label: const Text('Add Event',
-            style: TextStyle(fontWeight: FontWeight.w600)),
-        backgroundColor: theme.colorScheme.primary,
-        foregroundColor: Colors.white,
+            style: TextStyle(
+                fontFamily: 'Inter',
+                fontWeight: FontWeight.w700,
+                color: _onPrimary,
+                letterSpacing: 0.1)),
+        backgroundColor: _primary,
+        elevation: 0,
       ),
     );
   }
+}
 
-  void _showClassCode(BuildContext context, String code) {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Class Join Code'),
-        content: Column(
+// ─── Join code chip ─────────────────────────────────────────────────────────
+
+class _JoinCodeChip extends StatefulWidget {
+  final String code;
+  const _JoinCodeChip({required this.code});
+
+  @override
+  State<_JoinCodeChip> createState() => _JoinCodeChipState();
+}
+
+class _JoinCodeChipState extends State<_JoinCodeChip> {
+  bool _copied = false;
+
+  Future<void> _copy() async {
+    await Clipboard.setData(ClipboardData(text: widget.code));
+    setState(() => _copied = true);
+    await Future.delayed(const Duration(seconds: 2));
+    if (mounted) setState(() => _copied = false);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: _copy,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 250),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+        decoration: BoxDecoration(
+          color: _copied ? _primaryContainer : _surfaceHigh,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: _copied ? _primary.withValues(alpha: 0.4) : Colors.transparent,
+          ),
+        ),
+        child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
+            Icon(
+              _copied ? Icons.check_rounded : Icons.key_rounded,
+              size: 14,
+              color: _copied ? _primary : _muted,
+            ),
+            const SizedBox(width: 6),
             Text(
-              code,
-              style: const TextStyle(
-                fontSize: 36,
-                fontWeight: FontWeight.w800,
-                letterSpacing: 4,
+              _copied ? 'Copied!' : 'Join code: ',
+              style: TextStyle(
+                fontFamily: 'Inter',
+                fontSize: 12,
+                color: _copied ? _primary : _muted,
               ),
             ),
-            const SizedBox(height: 8),
-            const Text(
-              'Share this code with your classmates.',
-              textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.grey),
-            ),
+            if (!_copied)
+              Text(
+                widget.code,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 2,
+                  color: _onSurface.withValues(alpha: 0.75),
+                  fontFamily: 'monospace',
+                ),
+              ),
           ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Done'),
-          ),
-        ],
       ),
     );
   }
@@ -362,9 +435,15 @@ class _OfflineMenu extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return PopupMenuButton<String>(
+      color: _surfaceHigh,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: const BorderSide(color: _border),
+      ),
       icon: const CircleAvatar(
         radius: 16,
-        child: Icon(Icons.person_rounded, size: 18),
+        backgroundColor: _surfaceHigh,
+        child: Icon(Icons.person_rounded, size: 18, color: _onSurface),
       ),
       onSelected: (val) {
         if (val == 'signin') onSignIn();
@@ -373,9 +452,10 @@ class _OfflineMenu extends StatelessWidget {
         const PopupMenuItem(
           value: 'signin',
           child: Row(children: [
-            Icon(Icons.login_rounded, size: 18),
+            Icon(Icons.login_rounded, size: 18, color: _primary),
             SizedBox(width: 8),
-            Text('Sign in for class access'),
+            Text('Sign in for class access',
+                style: TextStyle(fontFamily: 'Inter', color: _onSurface)),
           ]),
         ),
       ],
@@ -387,61 +467,60 @@ class _OnlineMenu extends StatelessWidget {
   final User user;
   final ClassGroup? classGroup;
   final VoidCallback onSignOut;
-  final VoidCallback onShowCode;
   final VoidCallback onGoOffline;
+  
   const _OnlineMenu({
     required this.user,
     required this.classGroup,
     required this.onSignOut,
-    required this.onShowCode,
     required this.onGoOffline,
   });
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     return PopupMenuButton<String>(
+      color: _surfaceHigh,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: const BorderSide(color: _border),
+      ),
       icon: CircleAvatar(
         radius: 16,
         backgroundImage:
             user.photoURL != null ? NetworkImage(user.photoURL!) : null,
-        backgroundColor: theme.colorScheme.primaryContainer,
+        backgroundColor: _primaryContainer,
         child: user.photoURL == null
             ? Text(
                 user.displayName?.substring(0, 1) ?? 'U',
-                style: const TextStyle(fontWeight: FontWeight.bold),
+                style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontFamily: 'Inter',
+                    color: _primary),
               )
             : null,
       ),
       onSelected: (val) {
         if (val == 'signout') onSignOut();
-        if (val == 'code' && classGroup != null) onShowCode();
         if (val == 'offline') onGoOffline();
       },
       itemBuilder: (_) => [
-        if (classGroup != null)
-          PopupMenuItem(
-            value: 'code',
-            child: Row(children: [
-              const Icon(Icons.key_rounded, size: 18),
-              const SizedBox(width: 8),
-              Text('Join Code: ${classGroup!.classCode}'),
-            ]),
-          ),
         const PopupMenuItem(
           value: 'offline',
           child: Row(children: [
-            Icon(Icons.wifi_off_rounded, size: 18),
+            Icon(Icons.wifi_off_rounded, size: 18, color: _onSurface),
             SizedBox(width: 8),
-            Text('Switch to offline mode'),
+            Text('Switch to offline mode',
+                style: TextStyle(fontFamily: 'Inter', color: _onSurface)),
           ]),
         ),
+        const PopupMenuDivider(height: 1),
         const PopupMenuItem(
           value: 'signout',
           child: Row(children: [
-            Icon(Icons.logout_rounded, size: 18),
+            Icon(Icons.logout_rounded, size: 18, color: _terracotta),
             SizedBox(width: 8),
-            Text('Sign out'),
+            Text('Sign out',
+                style: TextStyle(fontFamily: 'Inter', color: _terracotta)),
           ]),
         ),
       ],
@@ -468,13 +547,20 @@ class _EventFeed extends StatelessWidget {
 
   List<Event> _filter(List<Event> events) {
     final upcoming = events.where((e) => !e.isPast).toList();
-    if (category == 'All') return upcoming;
-    final cat = category == 'Exams'
-        ? 'exam'
-        : category == 'Submissions'
-            ? 'submission'
-            : 'fest';
-    return upcoming.where((e) => e.category == cat).toList();
+    final filtered = category == 'All'
+        ? upcoming
+        : upcoming.where((e) {
+            final cat = category == 'Exams'
+                ? 'exam'
+                : category == 'Submissions'
+                    ? 'submission'
+                    : 'fest';
+            return e.category == cat;
+          }).toList();
+          
+    // Sort by date to maintain chronological urgency order
+    filtered.sort((a, b) => a.date.compareTo(b.date));
+    return filtered;
   }
 
   @override
@@ -483,10 +569,16 @@ class _EventFeed extends StatelessWidget {
       stream: stream,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
+          return const Center(
+              child: CircularProgressIndicator(color: _primary));
         }
         if (snapshot.hasError) {
-          return Center(child: Text('Error: ${snapshot.error}'));
+          return Center(
+            child: Text(
+              'Error: ${snapshot.error}',
+              style: const TextStyle(fontFamily: 'Inter', color: _terracotta),
+            ),
+          );
         }
 
         final events = _filter(snapshot.data ?? []);
@@ -499,21 +591,16 @@ class _EventFeed extends StatelessWidget {
                 Icon(
                   Icons.event_available_rounded,
                   size: 56,
-                  color: Theme.of(context)
-                      .colorScheme
-                      .onSurface
-                      .withValues(alpha: 0.2),
+                  color: _muted.withValues(alpha: 0.3),
                 ),
                 const SizedBox(height: 16),
                 Text(
                   emptyMessage,
                   textAlign: TextAlign.center,
                   style: TextStyle(
+                    fontFamily: 'Inter',
                     fontSize: 15,
-                    color: Theme.of(context)
-                        .colorScheme
-                        .onSurface
-                        .withValues(alpha: 0.4),
+                    color: _muted.withValues(alpha: 0.8),
                     height: 1.5,
                   ),
                 ),
@@ -523,7 +610,7 @@ class _EventFeed extends StatelessWidget {
         }
 
         return ListView.builder(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
           itemCount: events.length,
           itemBuilder: (context, index) {
             final event = events[index];

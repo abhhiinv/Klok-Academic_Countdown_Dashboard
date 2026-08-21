@@ -6,6 +6,17 @@ import '../services/firestore_service.dart';
 import '../services/local_storage_service.dart';
 import '../services/notification_service.dart';
 
+// ── Design tokens ────────────────────────────────────────────────────────
+const _bg = Color(0xFF1A1714);
+const _surfaceHigh = Color(0xFF2C2820);
+const _border = Color(0xFF3A3328);
+const _primary = Color(0xFFF0A500);
+const _onPrimary = Color(0xFF1A1714);
+const _onSurface = Color(0xFFF5EFE6);
+const _muted = Color(0xFF9C8E7E);
+const _terracotta = Color(0xFFE8956D);
+const _primaryContainer = Color(0xFF3D2E00);
+
 class AddEventScreen extends StatefulWidget {
   /// null in offline/guest mode
   final User? user;
@@ -74,19 +85,40 @@ class _AddEventScreenState extends State<AddEventScreen> {
       lastDate: now.add(const Duration(days: 365)),
       builder: (context, child) {
         return Theme(
-          data: Theme.of(context).copyWith(
-            colorScheme: Theme.of(context).colorScheme,
+          data: ThemeData.dark().copyWith(
+            colorScheme: const ColorScheme.dark(
+              primary: _primary,
+              onPrimary: _onPrimary,
+              surface: _surfaceHigh,
+              onSurface: _onSurface,
+            ),
+            dialogBackgroundColor: _bg,
           ),
           child: child!,
         );
       },
     );
     if (!mounted || picked == null) return;
+    
     // ignore: use_build_context_synchronously
     final time = await showTimePicker(
       context: context,
       initialTime: TimeOfDay.fromDateTime(
           DateTime.now().add(const Duration(hours: 1))),
+      builder: (context, child) {
+        return Theme(
+          data: ThemeData.dark().copyWith(
+            colorScheme: const ColorScheme.dark(
+              primary: _primary,
+              onPrimary: _onPrimary,
+              surface: _surfaceHigh,
+              onSurface: _onSurface,
+            ),
+            dialogBackgroundColor: _bg,
+          ),
+          child: child!,
+        );
+      },
     );
     if (mounted) {
       setState(() {
@@ -102,7 +134,11 @@ class _AddEventScreenState extends State<AddEventScreen> {
     if (!_formKey.currentState!.validate()) return;
     if (_selectedDate == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select a date.')),
+        const SnackBar(
+          content: Text('Please select a date.',
+              style: TextStyle(fontFamily: 'Inter')),
+          backgroundColor: _terracotta,
+        ),
       );
       return;
     }
@@ -135,7 +171,11 @@ class _AddEventScreenState extends State<AddEventScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to add event: $e')),
+          SnackBar(
+            content: Text('Failed to add event: $e',
+                style: const TextStyle(fontFamily: 'Inter')),
+            backgroundColor: _terracotta,
+          ),
         );
         setState(() => _isLoading = false);
       }
@@ -144,19 +184,19 @@ class _AddEventScreenState extends State<AddEventScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
     return Scaffold(
-      backgroundColor: theme.colorScheme.surface,
+      backgroundColor: _bg,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
+        iconTheme: const IconThemeData(color: _onSurface),
         title: const Text(
           'Add Event',
           style: TextStyle(
             fontFamily: 'Inter',
             fontWeight: FontWeight.w700,
             letterSpacing: -0.3,
+            color: _onSurface,
           ),
         ),
         leading: IconButton(
@@ -173,6 +213,7 @@ class _AddEventScreenState extends State<AddEventScreen> {
             TextFormField(
               controller: _titleController,
               textCapitalization: TextCapitalization.sentences,
+              style: const TextStyle(fontFamily: 'Inter', color: _onSurface),
               decoration: _inputDecoration(
                 context,
                 label: 'Event title',
@@ -185,12 +226,13 @@ class _AddEventScreenState extends State<AddEventScreen> {
             const SizedBox(height: 24),
 
             // Category
-            Text(
+            const Text(
               'Category',
               style: TextStyle(
+                fontFamily: 'Inter',
                 fontSize: 13,
                 fontWeight: FontWeight.w600,
-                color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                color: _muted,
                 letterSpacing: 0.5,
               ),
             ),
@@ -220,16 +262,15 @@ class _AddEventScreenState extends State<AddEventScreen> {
                 padding: const EdgeInsets.symmetric(
                     horizontal: 16, vertical: 16),
                 decoration: BoxDecoration(
-                  color: theme.colorScheme.surfaceContainerHighest,
+                  color: _surfaceHigh,
                   borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: _border),
                 ),
                 child: Row(
                   children: [
                     Icon(Icons.calendar_today_rounded,
                         size: 20,
-                        color: _selectedDate != null
-                            ? theme.colorScheme.primary
-                            : theme.colorScheme.onSurface.withValues(alpha: 0.4)),
+                        color: _selectedDate != null ? _primary : _muted),
                     const SizedBox(width: 12),
                     Expanded(
                       child: Text(
@@ -237,16 +278,14 @@ class _AddEventScreenState extends State<AddEventScreen> {
                             ? 'Select date & time'
                             : _formatSelectedDate(_selectedDate!),
                         style: TextStyle(
+                          fontFamily: 'Inter',
                           fontSize: 15,
-                          color: _selectedDate != null
-                              ? theme.colorScheme.onSurface
-                              : theme.colorScheme.onSurface.withValues(alpha: 0.4),
+                          color: _selectedDate != null ? _onSurface : _muted,
                         ),
                       ),
                     ),
                     Icon(Icons.chevron_right_rounded,
-                        color:
-                            theme.colorScheme.onSurface.withValues(alpha: 0.3)),
+                        color: _muted.withValues(alpha: 0.5)),
                   ],
                 ),
               ),
@@ -255,12 +294,13 @@ class _AddEventScreenState extends State<AddEventScreen> {
 
             // Feed selector — hidden in offline mode (personal only)
             if (!_isOffline) ...[
-              Text(
+              const Text(
                 'Add to',
                 style: TextStyle(
+                  fontFamily: 'Inter',
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
-                  color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                  color: _muted,
                   letterSpacing: 0.5,
                 ),
               ),
@@ -295,10 +335,10 @@ class _AddEventScreenState extends State<AddEventScreen> {
               child: ElevatedButton(
                 onPressed: _isLoading ? null : _submit,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: theme.colorScheme.primary,
-                  foregroundColor: Colors.white,
+                  backgroundColor: _primary,
+                  foregroundColor: _onPrimary,
                   shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14)),
+                      borderRadius: BorderRadius.circular(12)),
                   elevation: 0,
                 ),
                 child: _isLoading
@@ -306,10 +346,15 @@ class _AddEventScreenState extends State<AddEventScreen> {
                         width: 22,
                         height: 22,
                         child: CircularProgressIndicator(
-                            color: Colors.white, strokeWidth: 2.5))
-                    : const Text('Add Event',
+                            color: _onPrimary, strokeWidth: 2.5))
+                    : const Text(
+                        'Add Event',
                         style: TextStyle(
-                            fontSize: 16, fontWeight: FontWeight.w700)),
+                          fontFamily: 'Inter',
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
               ),
             ),
           ],
@@ -326,16 +371,30 @@ class _AddEventScreenState extends State<AddEventScreen> {
   }) {
     return InputDecoration(
       labelText: label,
+      labelStyle: const TextStyle(fontFamily: 'Inter', color: _muted),
       hintText: hint,
-      prefixIcon: Icon(icon, size: 20),
+      hintStyle: TextStyle(
+          fontFamily: 'Inter', color: _muted.withValues(alpha: 0.6)),
+      prefixIcon: Icon(icon, size: 20, color: _muted),
       filled: true,
-      fillColor: Theme.of(context).colorScheme.surfaceContainerHighest,
-      border: OutlineInputBorder(
+      fillColor: _surfaceHigh,
+      enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide.none,
+        borderSide: const BorderSide(color: _border),
       ),
-      contentPadding:
-          const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: _primary, width: 1.5),
+      ),
+      errorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: _terracotta),
+      ),
+      focusedErrorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: _terracotta, width: 1.5),
+      ),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
     );
   }
 
@@ -365,41 +424,30 @@ class _CategoryChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     return GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.symmetric(vertical: 10),
         decoration: BoxDecoration(
-          color: selected
-              ? theme.colorScheme.primaryContainer
-              : theme.colorScheme.surfaceContainerHighest,
+          color: selected ? _primaryContainer : _surfaceHigh,
           borderRadius: BorderRadius.circular(10),
           border: Border.all(
-            color: selected
-                ? theme.colorScheme.primary
-                : Colors.transparent,
+            color: selected ? _primary : _border,
             width: 1.5,
           ),
         ),
         child: Column(
           children: [
-            Icon(icon,
-                size: 20,
-                color: selected
-                    ? theme.colorScheme.primary
-                    : theme.colorScheme.onSurface.withValues(alpha: 0.4)),
+            Icon(icon, size: 20, color: selected ? _primary : _muted),
             const SizedBox(height: 4),
             Text(
               label,
               style: TextStyle(
+                fontFamily: 'Inter',
                 fontSize: 10,
-                fontWeight:
-                    selected ? FontWeight.w700 : FontWeight.w500,
-                color: selected
-                    ? theme.colorScheme.primary
-                    : theme.colorScheme.onSurface.withValues(alpha: 0.5),
+                fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                color: selected ? _primary : _muted,
               ),
             ),
           ],
@@ -424,43 +472,31 @@ class _FeedChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     return GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
-        padding:
-            const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
         decoration: BoxDecoration(
-          color: selected
-              ? theme.colorScheme.primaryContainer
-              : theme.colorScheme.surfaceContainerHighest,
+          color: selected ? _primaryContainer : _surfaceHigh,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: selected
-                ? theme.colorScheme.primary
-                : Colors.transparent,
+            color: selected ? _primary : _border,
             width: 1.5,
           ),
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon,
-                size: 18,
-                color: selected
-                    ? theme.colorScheme.primary
-                    : theme.colorScheme.onSurface.withValues(alpha: 0.4)),
+            Icon(icon, size: 18, color: selected ? _primary : _muted),
             const SizedBox(width: 8),
             Text(
               label,
               style: TextStyle(
+                fontFamily: 'Inter',
                 fontSize: 13,
-                fontWeight:
-                    selected ? FontWeight.w700 : FontWeight.w500,
-                color: selected
-                    ? theme.colorScheme.primary
-                    : theme.colorScheme.onSurface.withValues(alpha: 0.55),
+                fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                color: selected ? _primary : _muted,
               ),
             ),
           ],

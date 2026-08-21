@@ -4,9 +4,9 @@ import 'package:flutter/material.dart';
 /// Red < 3 days, Orange < 7 days, Green otherwise.
 Color getUrgencyColor(DateTime eventDate) {
   final diff = eventDate.difference(DateTime.now()).inDays;
-  if (diff < 3) return const Color(0xFFE53935); // Red
+  if (diff < 3) return const Color.fromARGB(255, 255, 60, 57); // Red
   if (diff < 7) return const Color(0xFFFB8C00); // Orange
-  return const Color(0xFF43A047); // Green
+  return const Color.fromARGB(255, 70, 215, 77); // Green
 }
 
 /// Returns urgency label text.
