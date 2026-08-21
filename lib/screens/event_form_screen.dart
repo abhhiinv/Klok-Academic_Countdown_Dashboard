@@ -18,16 +18,13 @@ const _terracotta = Color(0xFFE8956D);
 const _primaryContainer = Color(0xFF3D2E00);
 
 class AddEventScreen extends StatefulWidget {
-  /// null in offline/guest mode
   final User? user;
-
-  /// null in offline/guest mode
   final String? classId;
-
-  final int initialFeedIndex; // 0 = class, 1 = personal
-
-  /// Called after a local event is saved (offline mode only)
+  final int initialFeedIndex; 
   final VoidCallback? onLocalEventAdded;
+  
+  /// If provided, the screen operates in "Edit" mode.
+  final Event? eventToEdit;
 
   const AddEventScreen({
     super.key,
@@ -35,6 +32,7 @@ class AddEventScreen extends StatefulWidget {
     required this.classId,
     this.initialFeedIndex = 0,
     this.onLocalEventAdded,
+    this.eventToEdit,
   });
 
   @override
@@ -45,15 +43,16 @@ class _AddEventScreenState extends State<AddEventScreen> {
   final _firestoreService = FirestoreService();
   final _localService = LocalStorageService();
   final _uuid = const Uuid();
-  final _titleController = TextEditingController();
+  late final TextEditingController _titleController;
   final _formKey = GlobalKey<FormState>();
 
-  String _category = 'exam';
+  late String _category;
   DateTime? _selectedDate;
-  bool _isPersonal = false;
+  late bool _isPersonal;
   bool _isLoading = false;
 
   bool get _isOffline => widget.user == null;
+  bool get _isEditing => widget.eventToEdit != null;
 
   static const _categories = [
     ('exam', 'Exam', Icons.school_rounded),
@@ -65,8 +64,16 @@ class _AddEventScreenState extends State<AddEventScreen> {
   @override
   void initState() {
     super.initState();
-    // In offline mode, always save to personal (no class available)
-    _isPersonal = _isOffline || widget.initialFeedIndex == 1;
+    if (_isEditing) {
+      _titleController = TextEditingController(text: widget.eventToEdit!.title);
+      _category = widget.eventToEdit!.category;
+      _selectedDate = widget.eventToEdit!.date;
+      _isPersonal = widget.eventToEdit!.isPersonal;
+    } else {
+      _titleController = TextEditingController();
+      _category = 'exam';
+      _isPersonal = _isOffline || widget.initialFeedIndex == 1;
+    }
   }
 
   @override
@@ -76,11 +83,11 @@ class _AddEventScreenState extends State<AddEventScreen> {
   }
 
   Future<void> _pickDate() async {
-    final ctx = context; // capture before any await
+    final ctx = context; 
     final now = DateTime.now();
     final picked = await showDatePicker(
       context: ctx,
-      initialDate: now.add(const Duration(days: 7)),
+      initialDate: _selectedDate ?? now.add(const Duration(days: 7)),
       firstDate: now,
       lastDate: now.add(const Duration(days: 365)),
       builder: (context, child) {
@@ -103,8 +110,9 @@ class _AddEventScreenState extends State<AddEventScreen> {
     // ignore: use_build_context_synchronously
     final time = await showTimePicker(
       context: context,
-      initialTime: TimeOfDay.fromDateTime(
-          DateTime.now().add(const Duration(hours: 1))),
+      initialTime: _selectedDate != null 
+          ? TimeOfDay.fromDateTime(_selectedDate!)
+          : TimeOfDay.fromDateTime(now.add(const Duration(hours: 1))),
       builder: (context, child) {
         return Theme(
           data: ThemeData.dark().copyWith(
@@ -146,25 +154,44 @@ class _AddEventScreenState extends State<AddEventScreen> {
     setState(() => _isLoading = true);
 
     final event = Event(
-      id: _uuid.v4(),
+      id: _isEditing ? widget.eventToEdit!.id : _uuid.v4(),
       title: _titleController.text.trim(),
       category: _category,
       date: _selectedDate!,
-      createdBy: widget.user?.uid ?? 'local',
-      createdAt: DateTime.now(),
+      createdBy: _isEditing ? widget.eventToEdit!.createdBy : (widget.user?.uid ?? 'local'),
+      createdAt: _isEditing ? widget.eventToEdit!.createdAt : DateTime.now(),
       isPersonal: _isPersonal,
     );
 
     try {
       if (_isOffline) {
-        // Save to local device storage
-        await _localService.addPersonalEvent(event);
+        if (_isEditing) {
+          await _localService.updatePersonalEvent(event);
+        } else {
+          await _localService.addPersonalEvent(event);
+        }
         widget.onLocalEventAdded?.call();
-      } else if (_isPersonal) {
-        await _firestoreService.addPersonalEvent(widget.user!.uid, event);
       } else {
-        await _firestoreService.addClassEvent(widget.classId!, event);
+        // If the user changed the feed type (Class <-> Personal) while editing, 
+        // we must delete the old record from the old location and create a new one.
+        if (_isEditing && _isPersonal != widget.eventToEdit!.isPersonal) {
+           if (widget.eventToEdit!.isPersonal) {
+              await _firestoreService.deletePersonalEvent(widget.user!.uid, event.id);
+              await _firestoreService.addClassEvent(widget.classId!, event);
+           } else {
+              await _firestoreService.deleteClassEvent(widget.classId!, event.id);
+              await _firestoreService.addPersonalEvent(widget.user!.uid, event);
+           }
+        } else {
+          // Standard add/update
+          if (_isPersonal) {
+            await _firestoreService.addPersonalEvent(widget.user!.uid, event);
+          } else {
+            await _firestoreService.addClassEvent(widget.classId!, event);
+          }
+        }
       }
+      
       await NotificationService.scheduleEventNotifications(event);
 
       if (mounted) Navigator.pop(context);
@@ -172,7 +199,7 @@ class _AddEventScreenState extends State<AddEventScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to add event: $e',
+            content: Text('Failed to save event: $e',
                 style: const TextStyle(fontFamily: 'Inter')),
             backgroundColor: _terracotta,
           ),
@@ -190,9 +217,9 @@ class _AddEventScreenState extends State<AddEventScreen> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         iconTheme: const IconThemeData(color: _onSurface),
-        title: const Text(
-          'Add Event',
-          style: TextStyle(
+        title: Text(
+          _isEditing ? 'Edit Event' : 'Add Event',
+          style: const TextStyle(
             fontFamily: 'Inter',
             fontWeight: FontWeight.w700,
             letterSpacing: -0.3,
@@ -347,9 +374,9 @@ class _AddEventScreenState extends State<AddEventScreen> {
                         height: 22,
                         child: CircularProgressIndicator(
                             color: _onPrimary, strokeWidth: 2.5))
-                    : const Text(
-                        'Add Event',
-                        style: TextStyle(
+                    : Text(
+                        _isEditing ? 'Save Changes' : 'Add Event',
+                        style: const TextStyle(
                           fontFamily: 'Inter',
                           fontSize: 16,
                           fontWeight: FontWeight.w700,

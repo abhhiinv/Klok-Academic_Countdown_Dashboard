@@ -9,7 +9,7 @@ import '../services/auth_service.dart';
 import '../services/local_storage_service.dart';
 import '../widgets/event_card.dart';
 import '../widgets/category_tab_bar.dart';
-import 'add_event_screen.dart';
+import 'event_form_screen.dart';
 import 'archive_screen.dart';
 import 'onboarding_screen.dart';
 
@@ -30,11 +30,13 @@ class DashboardScreen extends StatefulWidget {
 
   /// null when in offline/guest mode
   final String? classId;
+  final ClassGroup? initialClassGroup;
 
   const DashboardScreen({
     super.key,
     required this.user,
     required this.classId,
+    this.initialClassGroup,
   });
 
   @override
@@ -51,6 +53,10 @@ class _DashboardScreenState extends State<DashboardScreen>
   String _selectedCategory = 'All';
   ClassGroup? _classGroup;
 
+  // Stream references cached once to prevent rebuilding on every frame
+  Stream<List<Event>>? _classEventsStream;
+  Stream<List<Event>>? _personalEventsStream;
+
   // For offline personal events we use a StreamController so deletes/adds
   // can trigger a refresh without Firestore.
   final _localEventsController = StreamController<List<Event>>.broadcast();
@@ -60,10 +66,19 @@ class _DashboardScreenState extends State<DashboardScreen>
   @override
   void initState() {
     super.initState();
-    // Online: 2 tabs (Class + Personal). Offline: 1 tab (Personal only).
     _tabController = TabController(length: _isOffline ? 1 : 2, vsync: this);
+    
+    // Use preloaded class group immediately to prevent layout pop-in
+    _classGroup = widget.initialClassGroup;
+
     if (!_isOffline) {
-      _loadClassGroup();
+      _classEventsStream = _firestoreService.classEventsStream(widget.classId!);
+      _personalEventsStream = _firestoreService.personalEventsStream(widget.user!.uid);
+      
+      // Only make network call if we didn't receive initial data
+      if (_classGroup == null) {
+        _loadClassGroup();
+      }
     } else {
       _refreshLocalEvents();
     }
@@ -126,165 +141,179 @@ class _DashboardScreenState extends State<DashboardScreen>
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: _bg,
-      body: SafeArea(
-        child: Column(
-          children: [
-            // ── App Bar ──────────────────────────────────────────────
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 12, 8, 0),
-              child: Row(
-                children: [
-                  // Logo
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(9),
-                    child: Image.asset(
-                      'assets/icons/app_icon.png',
-                      width: 64,
-                      height: 64,
-                      fit: BoxFit.cover,
+    return PopScope(
+      canPop: false, // Disables the default system pop
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        // Forces the hardware back button to use our exact app-level pop
+        Navigator.pop(context, result); 
+      },
+      child: Scaffold(
+        backgroundColor: _bg,
+        body: SafeArea(
+          child: Column(
+            children: [
+              // ── App Bar ──────────────────────────────────────────────
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 12, 8, 0),
+                child: Row(
+                  children: [
+                    if (!_isOffline)
+                      IconButton(
+                        icon: const Icon(Icons.arrow_back_ios_new_rounded, color: _onSurface, size: 22),
+                        onPressed: () => Navigator.pop(context),
+                      ),
+                    if (_isOffline) const SizedBox(width: 12),
+                    // Logo
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(9),
+                      child: Image.asset(
+                        'assets/icons/app_icon.png',
+                        width: 64,
+                        height: 64,
+                        fit: BoxFit.cover,
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 10),
-                  Text(
-                    _isOffline ? 'Personal' : (_classGroup?.name ?? 'Klok'),
-                    style: const TextStyle(
-                      fontFamily: 'Inter',
-                      fontWeight: FontWeight.w800,
-                      fontSize: 20,
-                      letterSpacing: -0.5,
-                      color: _onSurface,
+                    const SizedBox(width: 10),
+                    Text(
+                      _isOffline ? 'Personal' : (_classGroup?.name ?? 'Klok'),
+                      style: const TextStyle(
+                        fontFamily: 'Inter',
+                        fontWeight: FontWeight.w800,
+                        fontSize: 20,
+                        letterSpacing: -0.5,
+                        color: _onSurface,
+                      ),
                     ),
-                  ),
-                  const Spacer(),
+                    const Spacer(),
 
-                  // Archive
-                  if (!_isOffline)
-                    IconButton(
-                      icon: const Icon(Icons.archive_outlined,
-                          color: _muted, size: 32),
-                      tooltip: 'Archive',
-                      onPressed: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => ArchiveScreen(
-                            user: widget.user!,
-                            classId: widget.classId!,
-                            isAdmin: _isAdmin,
+                    // Archive
+                    if (!_isOffline)
+                      IconButton(
+                        icon: const Icon(Icons.archive_outlined,
+                            color: _muted, size: 32),
+                        tooltip: 'Archive',
+                        onPressed: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => ArchiveScreen(
+                              user: widget.user!,
+                              classId: widget.classId!,
+                              isAdmin: _isAdmin,
+                            ),
                           ),
                         ),
                       ),
-                    ),
 
-                  // Account menu
-                  _isOffline
-                      ? _OfflineMenu(onSignIn: _signInForClass)
-                      : _OnlineMenu(
-                          user: widget.user!,
-                          classGroup: _classGroup,
-                          onSignOut: _signOut,
-                          onGoOffline: _goOffline,
-                        ),
+                    // Account menu
+                    _isOffline
+                        ? _OfflineMenu(onSignIn: _signInForClass)
+                        : _OnlineMenu(
+                            user: widget.user!,
+                            classGroup: _classGroup,
+                            onSignOut: _signOut,
+                            onGoOffline: _goOffline,
+                          ),
 
-                  const SizedBox(width: 4),
-                ],
-              ),
-            ),
-
-            // ── Tab Bar (online) / Offline banner ─────────────────────
-            if (!_isOffline)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(8, 6, 8, 0),
-                child: TabBar(
-                  controller: _tabController,
-                  labelColor: _primary,
-                  unselectedLabelColor: _muted,
-                  indicatorColor: _primary,
-                  indicatorSize: TabBarIndicatorSize.label,
-                  dividerColor: _border,
-                  labelStyle: const TextStyle(
-                    fontFamily: 'Inter',
-                    fontWeight: FontWeight.w700,
-                    fontSize: 14,
-                  ),
-                  unselectedLabelStyle: const TextStyle(
-                    fontFamily: 'Inter',
-                    fontWeight: FontWeight.w500,
-                    fontSize: 14,
-                  ),
-                  tabs: [
-                    Tab(text: _classGroup?.name ?? 'Class'),
-                    const Tab(text: 'Personal'),
-                  ],
-                ),
-              )
-            else
-              Container(
-                margin: const EdgeInsets.fromLTRB(16, 10, 16, 0),
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-                decoration: BoxDecoration(
-                  color: _surfaceHigh,
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: _border),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.wifi_off_rounded, size: 30, color: _terracotta),
-                    const SizedBox(width: 8),
-                    const Expanded(
-                      child: Text(
-                        'Offline-Mode : Privacy first mode',
-                        style: TextStyle(
-                            fontFamily: 'Inter', fontSize: 13, color: _onSurface),
-                      ),
-                    ),
-                    GestureDetector(
-                      onTap: _signInForClass,
-                      child: const Text(
-                        'Sign in',
-                        style: TextStyle(
-                          fontFamily: 'Inter',
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                          color: _primary,
-                        ),
-                      ),
-                    ),
+                    const SizedBox(width: 4),
                   ],
                 ),
               ),
 
-            // ── Join code chip (class tab only) ───────────────────────
-            if (!_isOffline && _classGroup != null)
-              AnimatedBuilder(
-                animation: _tabController,
-                builder: (context, _) {
-                  final onClassTab = _tabController.index == 0;
-                  return AnimatedCrossFade(
-                    duration: const Duration(milliseconds: 200),
-                    crossFadeState: onClassTab
-                        ? CrossFadeState.showFirst
-                        : CrossFadeState.showSecond,
-                    firstChild: Padding(
-                      padding: const EdgeInsets.fromLTRB(20, 10, 20, 0),
-                      child: _JoinCodeChip(code: _classGroup!.classCode),
+              // ── Tab Bar (online) / Offline banner ─────────────────────
+              if (!_isOffline)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(8, 6, 8, 0),
+                  child: TabBar(
+                    controller: _tabController,
+                    labelColor: _primary,
+                    unselectedLabelColor: _muted,
+                    indicatorColor: _primary,
+                    indicatorSize: TabBarIndicatorSize.label,
+                    dividerColor: _border,
+                    labelStyle: const TextStyle(
+                      fontFamily: 'Inter',
+                      fontWeight: FontWeight.w700,
+                      fontSize: 14,
                     ),
-                    secondChild: const SizedBox.shrink(),
-                  );
-                },
+                    unselectedLabelStyle: const TextStyle(
+                      fontFamily: 'Inter',
+                      fontWeight: FontWeight.w500,
+                      fontSize: 14,
+                    ),
+                    tabs: [
+                      Tab(text: _classGroup?.name ?? 'Class'),
+                      const Tab(text: 'Personal'),
+                    ],
+                  ),
+                )
+              else
+                Container(
+                  margin: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                  decoration: BoxDecoration(
+                    color: _surfaceHigh,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: _border),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.wifi_off_rounded, size: 30, color: _terracotta),
+                      const SizedBox(width: 8),
+                      const Expanded(
+                        child: Text(
+                          'Offline-Mode : Privacy first mode',
+                          style: TextStyle(
+                              fontFamily: 'Inter', fontSize: 13, color: _onSurface),
+                        ),
+                      ),
+                      GestureDetector(
+                        onTap: _signInForClass,
+                        child: const Text(
+                          'Sign in',
+                          style: TextStyle(
+                            fontFamily: 'Inter',
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: _primary,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+              // ── Join code chip (class tab only) ───────────────────────
+              if (!_isOffline && _classGroup != null)
+                AnimatedBuilder(
+                  animation: _tabController,
+                  builder: (context, _) {
+                    final onClassTab = _tabController.index == 0;
+                    return AnimatedCrossFade(
+                      duration: const Duration(milliseconds: 200),
+                      crossFadeState: onClassTab
+                          ? CrossFadeState.showFirst
+                          : CrossFadeState.showSecond,
+                      firstChild: Padding(
+                        padding: const EdgeInsets.fromLTRB(20, 10, 20, 0),
+                        child: _JoinCodeChip(code: _classGroup!.classCode),
+                      ),
+                      secondChild: const SizedBox.shrink(),
+                    );
+                  },
+                ),
+
+              const SizedBox(height: 14),
+
+              // ── Category filter ────────────────────────────────────────
+              CategoryTabBar(
+                selected: _selectedCategory,
+                onSelected: (cat) => setState(() => _selectedCategory = cat),
               ),
+              const SizedBox(height: 12),
 
-            const SizedBox(height: 14),
-
-            // ── Category filter ────────────────────────────────────────
-            CategoryTabBar(
-              selected: _selectedCategory,
-              onSelected: (cat) => setState(() => _selectedCategory = cat),
-            ),
-            const SizedBox(height: 12),
-
-            // ── Feeds ─────────────────────────────────────────────────
+              // ── Feeds ─────────────────────────────────────────────────
+              // ── Feeds ─────────────────────────────────────────────────
             Expanded(
               child: _isOffline
                   ? _EventFeed(
@@ -295,38 +324,78 @@ class _DashboardScreenState extends State<DashboardScreen>
                         await _localService.deletePersonalEvent(event.id);
                         _refreshLocalEvents();
                       },
+                      onEdit: (event) async {
+                        await Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => AddEventScreen(
+                              user: widget.user,
+                              classId: widget.classId,
+                              initialFeedIndex: 1,
+                              eventToEdit: event,
+                              onLocalEventAdded: _refreshLocalEvents,
+                            ),
+                          ),
+                        );
+                        _refreshLocalEvents();
+                      },
                       emptyMessage: 'No personal events.\nTap + to add one.',
                     )
                   : TabBarView(
                       controller: _tabController,
                       children: [
                         _EventFeed(
-                          stream: _firestoreService
-                              .classEventsStream(widget.classId!),
+                          stream: _classEventsStream!,
                           category: _selectedCategory,
                           isAdmin: _isAdmin,
                           onDelete: (event) => _firestoreService
                               .deleteClassEvent(widget.classId!, event.id),
+                          onEdit: (event) async {
+                            await Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => AddEventScreen(
+                                  user: widget.user,
+                                  classId: widget.classId,
+                                  initialFeedIndex: 0,
+                                  eventToEdit: event,
+                                ),
+                              ),
+                            );
+                          },
                           emptyMessage:
                               'No upcoming class events.\nTap + to add one.',
                         ),
                         _EventFeed(
-                          stream: _firestoreService
-                              .personalEventsStream(widget.user!.uid),
+                          stream: _personalEventsStream!,
                           category: _selectedCategory,
                           isAdmin: true,
                           onDelete: (event) =>
                               _firestoreService.deletePersonalEvent(
                                   widget.user!.uid, event.id),
+                          onEdit: (event) async {
+                            await Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => AddEventScreen(
+                                  user: widget.user,
+                                  classId: widget.classId,
+                                  initialFeedIndex: 1,
+                                  eventToEdit: event,
+                                ),
+                              ),
+                            );
+                          },
                           emptyMessage:
                               'No personal events.\nTap + to add one.',
                         ),
                       ],
                     ),
             ),
-          ],
+            ],
+          ),
         ),
-      ),
+        
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () async {
           await Navigator.push(
@@ -352,7 +421,8 @@ class _DashboardScreenState extends State<DashboardScreen>
         backgroundColor: _primary,
         elevation: 0,
       ),
-    );
+    ),
+  );
   }
 }
 
@@ -529,11 +599,12 @@ class _OnlineMenu extends StatelessWidget {
 
 // ─── Event feed ────────────────────────────────────────────────────────────
 
-class _EventFeed extends StatelessWidget {
+class _EventFeed extends StatefulWidget {
   final Stream<List<Event>> stream;
   final String category;
   final bool isAdmin;
   final Future<void> Function(Event) onDelete;
+  final void Function(Event) onEdit;
   final String emptyMessage;
 
   const _EventFeed({
@@ -541,35 +612,46 @@ class _EventFeed extends StatelessWidget {
     required this.category,
     required this.isAdmin,
     required this.onDelete,
+    required this.onEdit,
     required this.emptyMessage,
   });
+  @override
+  State<_EventFeed> createState() => _EventFeedState();
+}
 
+class _EventFeedState extends State<_EventFeed> with AutomaticKeepAliveClientMixin {
+  
+  @override
+  bool get wantKeepAlive => true;
+  
   List<Event> _filter(List<Event> events) {
     final upcoming = events.where((e) => !e.isPast).toList();
-    final filtered = category == 'All'
+    final filtered = widget.category == 'All'
         ? upcoming
         : upcoming.where((e) {
-            final cat = category == 'Exams'
+            final cat = widget.category == 'Exams'
                 ? 'exam'
-                : category == 'Submissions'
+                : widget.category == 'Submissions'
                     ? 'submission'
                     : 'fest';
             return e.category == cat;
           }).toList();
           
-    // Sort by date to maintain chronological urgency order
     filtered.sort((a, b) => a.date.compareTo(b.date));
     return filtered;
   }
 
   @override
   Widget build(BuildContext context) {
+    super.build(context);
+
     return StreamBuilder<List<Event>>(
-      stream: stream,
+      stream: widget.stream,
       builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
+        if (snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData) {
           return const Center(
-              child: CircularProgressIndicator(color: _primary));
+            child: CircularProgressIndicator(color: _primary),
+          );
         }
         if (snapshot.hasError) {
           return Center(
@@ -594,7 +676,7 @@ class _EventFeed extends StatelessWidget {
                 ),
                 const SizedBox(height: 16),
                 Text(
-                  emptyMessage,
+                  widget.emptyMessage,
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontFamily: 'Inter',
@@ -615,8 +697,9 @@ class _EventFeed extends StatelessWidget {
             final event = events[index];
             return EventCard(
               event: event,
-              isAdmin: isAdmin,
-              onDelete: () => onDelete(event),
+              isAdmin: widget.isAdmin,
+              onDelete: () => widget.onDelete(event),
+              onEdit: () => widget.onEdit(event),
             );
           },
         );

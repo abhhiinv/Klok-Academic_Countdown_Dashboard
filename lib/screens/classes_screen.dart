@@ -41,15 +41,17 @@ class _ClassesScreenState extends State<ClassesScreen> {
     _loadClasses();
   }
 
-  Future<void> _loadClasses() async {
-    setState(() => _isLoading = true);
+  Future<void> _loadClasses({bool silent = false}) async {
+    if (!mounted) return;
+    if (!silent) setState(() => _isLoading = true);
+    
     final classes = await _firestoreService.getUserClasses(widget.user.uid);
-    if (mounted) {
-      setState(() {
-        _classes = classes;
-        _isLoading = false;
-      });
-    }
+    if (!mounted) return;
+    
+    setState(() {
+      _classes = classes;
+      _isLoading = false;
+    });
   }
 
   Future<void> _signOut() async {
@@ -98,9 +100,11 @@ class _ClassesScreenState extends State<ClassesScreen> {
         builder: (_) => DashboardScreen(
           user: widget.user,
           classId: group.id,
+          initialClassGroup: group, // Instant render on frame 1
         ),
       ),
-    ).then((_) => _loadClasses()); // refresh in case events were added
+    );
+    // Removed the background refresh here so the screen stays frozen and smooth!
   }
 
   @override

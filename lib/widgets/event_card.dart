@@ -15,12 +15,14 @@ class EventCard extends StatefulWidget {
   final Event event;
   final bool isAdmin;
   final VoidCallback? onDelete;
+  final VoidCallback? onEdit;
 
   const EventCard({
     super.key,
     required this.event,
     this.isAdmin = false,
     this.onDelete,
+    this.onEdit,
   });
 
   @override
@@ -82,11 +84,11 @@ class _EventCardState extends State<EventCard>
     if (widget.event.isPast) return _muted;
     switch (widget.event.urgencyLevel) {
       case 0:
-        return const Color.fromARGB(255, 255, 91, 91); // Urgent (Red/Terracotta)
+        return _terracotta; 
       case 1:
-        return _primary; // Soon (Yellow/Amber)
+        return _primary; 
       default:
-        return const Color.fromARGB(255, 68, 191, 55); // Relaxed (Earthy Green)
+        return const Color(0xFF7B9E77); 
     }
   }
 
@@ -116,20 +118,16 @@ class _EventCardState extends State<EventCard>
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // Colored urgency stripe
               Container(
                 width: 4,
                 color: urgencyColor,
               ),
-              
-              // Main card content
               Expanded(
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(10, 14, 14, 14),
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
-                      // Left side: Event info & Countdown
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -137,7 +135,6 @@ class _EventCardState extends State<EventCard>
                           children: [
                             Row(
                               children: [
-                                // Category icon dot
                                 Container(
                                   padding: const EdgeInsets.all(8),
                                   decoration: BoxDecoration(
@@ -147,12 +144,11 @@ class _EventCardState extends State<EventCard>
                                   ),
                                   child: Icon(
                                     _getCategoryIcon(widget.event.category),
-                                    size: 30,
+                                    size: 16,
                                     color: _muted,
                                   ),
                                 ),
                                 const SizedBox(width: 12),
-                                // Title & Date
                                 Expanded(
                                   child: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -181,7 +177,6 @@ class _EventCardState extends State<EventCard>
                               ],
                             ),
                             const SizedBox(height: 16),
-                            // Countdown pill
                             Container(
                               padding: const EdgeInsets.symmetric(
                                   horizontal: 12, vertical: 10),
@@ -215,55 +210,67 @@ class _EventCardState extends State<EventCard>
                         ),
                       ),
                       
-                      // Right side: The Larger, Centered Delete Button
-                      if (widget.isAdmin && widget.onDelete != null)
+                      // Right side: Edit & Delete Buttons
+                      if (widget.isAdmin)
                         Padding(
-                          padding: const EdgeInsets.only(left: 16),
-                          child: IconButton(
-                            icon: const Icon(Icons.delete_outline_rounded,
-                                color: _terracotta, size: 28),
-                            onPressed: () async {
-                              final ok = await showDialog<bool>(
-                                context: context,
-                                builder: (ctx) => AlertDialog(
-                                  backgroundColor: _surfaceHigh,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(16),
-                                    side: const BorderSide(color: _border),
-                                  ),
-                                  title: const Text('Delete Event',
-                                      style: TextStyle(
-                                          fontFamily: 'Inter',
-                                          color: _onSurface,
-                                          fontWeight: FontWeight.w700)),
-                                  content: const Text(
-                                      'Are you sure you want to delete this event?',
-                                      style: TextStyle(
-                                          fontFamily: 'Inter', color: _muted)),
-                                  actions: [
-                                    TextButton(
-                                      onPressed: () => Navigator.pop(ctx, false),
-                                      child: const Text('Cancel',
-                                          style: TextStyle(
-                                              fontFamily: 'Inter',
-                                              color: _muted,
-                                              fontWeight: FontWeight.w600)),
-                                    ),
-                                    TextButton(
-                                      onPressed: () => Navigator.pop(ctx, true),
-                                      child: const Text('Delete',
-                                          style: TextStyle(
-                                              fontFamily: 'Inter',
-                                              color: _terracotta,
-                                              fontWeight: FontWeight.w700)),
-                                    ),
-                                  ],
+                          padding: const EdgeInsets.only(left: 12),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if (widget.onEdit != null)
+                                IconButton(
+                                  icon: const Icon(Icons.edit_rounded,
+                                      color: _muted, size: 26),
+                                  onPressed: widget.onEdit,
                                 ),
-                              );
-                              if (ok == true) {
-                                widget.onDelete!();
-                              }
-                            },
+                              if (widget.onDelete != null)
+                                IconButton(
+                                  icon: const Icon(Icons.delete_outline_rounded,
+                                      color: _terracotta, size: 28),
+                                  onPressed: () async {
+                                    final ok = await showDialog<bool>(
+                                      context: context,
+                                      builder: (ctx) => AlertDialog(
+                                        backgroundColor: _surfaceHigh,
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(16),
+                                          side: const BorderSide(color: _border),
+                                        ),
+                                        title: const Text('Delete Event',
+                                            style: TextStyle(
+                                                fontFamily: 'Inter',
+                                                color: _onSurface,
+                                                fontWeight: FontWeight.w700)),
+                                        content: const Text(
+                                            'Are you sure you want to delete this event?',
+                                            style: TextStyle(
+                                                fontFamily: 'Inter', color: _muted)),
+                                        actions: [
+                                          TextButton(
+                                            onPressed: () => Navigator.pop(ctx, false),
+                                            child: const Text('Cancel',
+                                                style: TextStyle(
+                                                    fontFamily: 'Inter',
+                                                    color: _muted,
+                                                    fontWeight: FontWeight.w600)),
+                                          ),
+                                          TextButton(
+                                            onPressed: () => Navigator.pop(ctx, true),
+                                            child: const Text('Delete',
+                                                style: TextStyle(
+                                                    fontFamily: 'Inter',
+                                                    color: _terracotta,
+                                                    fontWeight: FontWeight.w700)),
+                                          ),
+                                        ],
+                                      ),
+                                    );
+                                    if (ok == true) {
+                                      widget.onDelete!();
+                                    }
+                                  },
+                                ),
+                            ],
                           ),
                         ),
                     ],

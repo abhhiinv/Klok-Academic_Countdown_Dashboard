@@ -35,6 +35,19 @@ class LocalStorageService {
     raw.add(jsonEncode(_eventToJson(event)));
     await prefs.setStringList(_eventsKey, raw);
   }
+  Future<void> updatePersonalEvent(Event updatedEvent) async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getStringList(_eventsKey) ?? [];
+    
+    for (int i = 0; i < raw.length; i++) {
+      final map = jsonDecode(raw[i]) as Map<String, dynamic>;
+      if (map['id'] == updatedEvent.id) {
+        raw[i] = jsonEncode(_eventToJson(updatedEvent));
+        break;
+      }
+    }
+    await prefs.setStringList(_eventsKey, raw);
+  }
 
   Future<void> deletePersonalEvent(String id) async {
     final prefs = await SharedPreferences.getInstance();
