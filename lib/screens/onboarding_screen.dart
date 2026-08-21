@@ -187,40 +187,47 @@ class _OnboardingScreenState extends State<OnboardingScreen>
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // Logo area
-                Container(
-                  width: 56,
-                  height: 56,
-                  decoration: BoxDecoration(
-                    color: _primary,
-                    borderRadius: BorderRadius.circular(16),
+                Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(9),
+                        child: Image.asset(
+                          'assets/icons/app_icon.png',
+                          width: 128,
+                          height: 128,
+                          fit: BoxFit.cover,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      const Text(
+                        'Klok',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontFamily: 'Inter',
+                          fontSize: 40,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: -1.5,
+                          color: _onSurface,
+                        ),
+                      ),
+                      Text(
+                        'Academic Countdown Dashboard',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontFamily: 'Inter',
+                          fontSize: 16,
+                          color: _muted.withValues(alpha: 0.8),
+                          height: 1.5,
+                        ),
+                      ),
+                    ],
                   ),
-                  child: const Icon(Icons.access_time_rounded,
-                      color: _onPrimary, size: 30),
                 ),
+
                 const SizedBox(height: 32),
-
-                const Text(
-                  'Klok',
-                  style: TextStyle(
-                    fontFamily: 'Inter',
-                    fontSize: 40,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: -1.5,
-                    color: _onSurface,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Academic Countdown Dashboard',
-                  style: TextStyle(
-                    fontFamily: 'Inter',
-                    fontSize: 16,
-                    color: _muted.withValues(alpha: 0.8),
-                    height: 1.5,
-                  ),
-                ),
-
-                const SizedBox(height: 48),
 
                 if (!_showClassSetup) ...[
                   _SignInSection(

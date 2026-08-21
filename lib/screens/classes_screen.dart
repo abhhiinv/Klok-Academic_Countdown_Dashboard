@@ -116,15 +116,14 @@ class _ClassesScreenState extends State<ClassesScreen> {
               padding: const EdgeInsets.fromLTRB(16, 8, 4, 0),
               child: Row(
                 children: [
-                  Container(
-                    width: 32,
-                    height: 32,
-                    decoration: BoxDecoration(
-                      color: _primary,
-                      borderRadius: BorderRadius.circular(9),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(9),
+                    child: Image.asset(
+                      'assets/icons/app_icon.png',
+                      width: 48,
+                      height: 48,
+                      fit: BoxFit.cover,
                     ),
-                    child: const Icon(Icons.access_time_rounded,
-                        color: _onPrimary, size: 18),
                   ),
                   const SizedBox(width: 10),
                   const Text(
@@ -145,7 +144,7 @@ class _ClassesScreenState extends State<ClassesScreen> {
                       side: const BorderSide(color: _border),
                     ),
                     icon: CircleAvatar(
-                      radius: 16,
+                      radius: 20,
                       backgroundImage: widget.user.photoURL != null
                           ? NetworkImage(widget.user.photoURL!)
                           : null,

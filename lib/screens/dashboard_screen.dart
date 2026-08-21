@@ -137,15 +137,14 @@ class _DashboardScreenState extends State<DashboardScreen>
               child: Row(
                 children: [
                   // Logo
-                  Container(
-                    width: 34,
-                    height: 34,
-                    decoration: BoxDecoration(
-                      color: _primary,
-                      borderRadius: BorderRadius.circular(10),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(9),
+                    child: Image.asset(
+                      'assets/icons/app_icon.png',
+                      width: 64,
+                      height: 64,
+                      fit: BoxFit.cover,
                     ),
-                    child: const Icon(Icons.access_time_rounded,
-                        color: _onPrimary, size: 18),
                   ),
                   const SizedBox(width: 10),
                   Text(
@@ -164,7 +163,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                   if (!_isOffline)
                     IconButton(
                       icon: const Icon(Icons.archive_outlined,
-                          color: _muted, size: 22),
+                          color: _muted, size: 32),
                       tooltip: 'Archive',
                       onPressed: () => Navigator.push(
                         context,
@@ -441,9 +440,9 @@ class _OfflineMenu extends StatelessWidget {
         side: const BorderSide(color: _border),
       ),
       icon: const CircleAvatar(
-        radius: 16,
+        radius: 20,
         backgroundColor: _surfaceHigh,
-        child: Icon(Icons.person_rounded, size: 18, color: _onSurface),
+        child: Icon(Icons.person_rounded, size: 24, color: _onSurface),
       ),
       onSelected: (val) {
         if (val == 'signin') onSignIn();
@@ -452,7 +451,7 @@ class _OfflineMenu extends StatelessWidget {
         const PopupMenuItem(
           value: 'signin',
           child: Row(children: [
-            Icon(Icons.login_rounded, size: 18, color: _primary),
+            Icon(Icons.login_rounded, size: 24, color: _primary),
             SizedBox(width: 8),
             Text('Sign in for class access',
                 style: TextStyle(fontFamily: 'Inter', color: _onSurface)),
@@ -485,7 +484,7 @@ class _OnlineMenu extends StatelessWidget {
         side: const BorderSide(color: _border),
       ),
       icon: CircleAvatar(
-        radius: 16,
+        radius: 20,
         backgroundImage:
             user.photoURL != null ? NetworkImage(user.photoURL!) : null,
         backgroundColor: _primaryContainer,

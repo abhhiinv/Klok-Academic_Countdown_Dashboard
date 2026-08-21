@@ -9,11 +9,11 @@ const _bg = Color(0xFF1A1714);
 const _surfaceHigh = Color(0xFF2C2820);
 const _border = Color(0xFF3A3328);
 const _primary = Color(0xFFF0A500);
-const _onPrimary = Color(0xFF1A1714);
+// const _onPrimary = Color(0xFF1A1714);
 const _onSurface = Color(0xFFF5EFE6);
 const _muted = Color(0xFF9C8E7E);
 const _terracotta = Color(0xFFE8956D);
-const _primaryContainer = Color(0xFF3D2E00);
+// const _primaryContainer = Color(0xFF3D2E00);
 
 class ArchiveScreen extends StatelessWidget {
   final User user;
@@ -136,7 +136,7 @@ class _ArchiveFeed extends StatelessWidget {
               children: [
                 Icon(
                   Icons.inventory_2_rounded,
-                  size: 56,
+                  size: 64,
                   color: _muted.withValues(alpha: 0.3),
                 ),
                 const SizedBox(height: 16),
